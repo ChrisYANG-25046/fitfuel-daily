@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, FormEvent } from "react";
+import { useEffect, useState, useCallback, useRef, FormEvent } from "react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { Meal, Preset, PresetInsertInput } from "@/types/meal";
 import {
@@ -23,6 +23,8 @@ import {
   BookmarkPlus,
   Zap,
   Settings2,
+  Camera,
+  X,
 } from "lucide-react";
 
 // =================================================================
@@ -585,13 +587,25 @@ export default function Home() {
   const [fat, setFat] = useState("");
   const [carbs, setCarbs] = useState("");
 
+  // 画像アップロード & AI解析状態
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [analyzingImage, setAnalyzingImage] = useState(false);
+  const [imageAnalysisInfo, setImageAnalysisInfo] = useState<{
+    food_name: string;
+    confidence: number;
+    note?: string;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // 自動予測に関する通知メモ
   const [estimateNote, setEstimateNote] = useState<string | null>(null);
 
-  // 1日の目標カロリー（デフォルト: 2000 kcal）
+  // 1日の目標カロリー（デフォルト: 2000 kcal、Supabase user_settings と同期）
   const [targetCalories, setTargetCalories] = useState<number>(2000);
+  const [userSettingsId, setUserSettingsId] = useState<number | string>(1);
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [customTargetInput, setCustomTargetInput] = useState("2000");
+  const [savingTarget, setSavingTarget] = useState(false);
 
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [loadingPresets, setLoadingPresets] = useState(isSupabaseConfigured);
@@ -661,7 +675,21 @@ export default function Home() {
     }
   }, []);
 
-  // 初回マウント時に meals と presets を両方取得
+  // 初期ローカルキャッシュからの目標カロリー復元（F5時の画面ちらつき防止）
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("fitfuel_target_calories");
+      if (cached) {
+        const val = parseInt(cached, 10);
+        if (!isNaN(val) && val > 0) {
+          setTargetCalories(val);
+          setCustomTargetInput(val.toString());
+        }
+      }
+    } catch {}
+  }, []);
+
+  // 初回マウント時に meals, presets, user_settings をすべて取得
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let ignore = false;
@@ -700,6 +728,29 @@ export default function Home() {
         setLoadingPresets(false);
       });
 
+    // 3. ユーザー設定 (user_settings: 目標カロリー) の取得
+    supabase
+      .from("user_settings")
+      .select("*")
+      .order("id", { ascending: true })
+      .limit(1)
+      .then(({ data, error }) => {
+        if (ignore) return;
+        if (error) {
+          console.error("user_settings データの取得に失敗しました:", error);
+        } else if (data && data.length > 0) {
+          const settings = data[0];
+          setUserSettingsId(settings.id);
+          if (settings.target_calories && settings.target_calories > 0) {
+            setTargetCalories(settings.target_calories);
+            setCustomTargetInput(settings.target_calories.toString());
+            try {
+              localStorage.setItem("fitfuel_target_calories", settings.target_calories.toString());
+            } catch {}
+          }
+        }
+      });
+
     return () => {
       ignore = true;
     };
@@ -732,6 +783,81 @@ export default function Home() {
       setEstimateNote(
         `「${trimmed}」の標準的な概算値（${result.calories} kcal）を入力しました。※概算値です。必要に応じて微調整してください。`
       );
+    }
+  };
+
+  // 写真ファイル選択時のAI解析処理
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setStatusMessage({
+        type: "error",
+        text: "JPEGまたはPNG形式の画像ファイルを選択してください",
+      });
+      return;
+    }
+
+    // プレビューの作成
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreviewUrl(previewUrl);
+    setAnalyzingImage(true);
+    setStatusMessage(null);
+    setEstimateNote(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const res = await fetch("/api/analyze-food-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "画像解析に失敗しました");
+      }
+
+      const { food_name, calories, protein, fat, carbs, confidence, note } =
+        json.data;
+
+      // フォーム各入力欄に自動反映（ユーザーは後から自由に編集可能）
+      setFoodName(food_name);
+      setCalories(calories.toString());
+      setProtein(protein.toString());
+      setFat(fat.toString());
+      setCarbs(carbs.toString());
+
+      setImageAnalysisInfo({
+        food_name,
+        confidence,
+        note,
+      });
+
+      setStatusMessage({
+        type: "success",
+        text: `📸 写真から「${food_name}」（${calories} kcal）をAI解析・自動セットしました！`,
+      });
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("写真解析エラー:", error);
+      setStatusMessage({
+        type: "error",
+        text: `写真の解析に失敗しました: ${error.message}`,
+      });
+    } finally {
+      setAnalyzingImage(false);
+    }
+  };
+
+  // アップロード写真の解除
+  const handleClearImage = () => {
+    setImagePreviewUrl(null);
+    setImageAnalysisInfo(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -807,6 +933,7 @@ export default function Home() {
       setFat("");
       setCarbs("");
       setEstimateNote(null);
+      handleClearImage();
 
       setStatusMessage({
         type: "success",
@@ -1034,12 +1161,62 @@ export default function Home() {
     setEstimateNote(`マイセット「${preset.food_name}」を入力フォームに反映しました。`);
   };
 
-  // 目標カロリー保存
-  const handleSaveTarget = () => {
+  // 目標カロリー保存（Supabase user_settings テーブルへの UPDATE / UPSERT 同期）
+  const handleSaveTarget = async () => {
     const val = parseInt(customTargetInput, 10);
-    if (!isNaN(val) && val > 0) {
+    if (isNaN(val) || val <= 0) {
+      setStatusMessage({
+        type: "error",
+        text: "目標カロリーには1以上の有効な数値を入力してください",
+      });
+      return;
+    }
+
+    setSavingTarget(true);
+    setStatusMessage(null);
+    try {
+      if (isSupabaseConfigured) {
+        // user_settings テーブルを更新
+        const { error } = await supabase
+          .from("user_settings")
+          .update({
+            target_calories: val,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", userSettingsId);
+
+        if (error) {
+          // レコードが存在しなかった場合は upsert で作成
+          const { error: upsertErr } = await supabase
+            .from("user_settings")
+            .upsert({
+              id: userSettingsId,
+              target_calories: val,
+              updated_at: new Date().toISOString(),
+            });
+          if (upsertErr) throw upsertErr;
+        }
+      }
+
       setTargetCalories(val);
       setIsEditingTarget(false);
+      try {
+        localStorage.setItem("fitfuel_target_calories", val.toString());
+      } catch {}
+
+      setStatusMessage({
+        type: "success",
+        text: `🎯 1日の目標カロリーを ${val.toLocaleString()} kcal に更新・保存しました！（リロード後も保持されます）`,
+      });
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("目標カロリーの保存に失敗:", error);
+      setStatusMessage({
+        type: "error",
+        text: `目標カロリーの保存に失敗しました: ${error.message}`,
+      });
+    } finally {
+      setSavingTarget(false);
     }
   };
 
@@ -1165,25 +1342,50 @@ export default function Home() {
               {/* 目標値変更エリア */}
               <div className="flex items-center gap-2 text-xs">
                 {isEditingTarget ? (
-                  <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSaveTarget();
+                    }}
+                    className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200"
+                  >
                     <input
                       type="number"
-                      min="500"
+                      min="100"
                       step="50"
                       value={customTargetInput}
                       onChange={(e) => setCustomTargetInput(e.target.value)}
-                      className="w-20 px-2 py-1 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:outline-none"
+                      disabled={savingTarget}
+                      autoFocus
+                      className="w-20 px-2 py-1 bg-white border border-slate-300 rounded-lg text-slate-900 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
-                    <span className="text-slate-500">kcal</span>
+                    <span className="text-slate-500 font-medium text-xs">kcal</span>
+                    <button
+                      type="submit"
+                      disabled={savingTarget}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg cursor-pointer flex items-center gap-1 font-semibold text-xs shadow-sm transition-all disabled:opacity-50"
+                      title="Supabaseに目標カロリーを保存"
+                    >
+                      {savingTarget ? (
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Check className="w-3.5 h-3.5" />
+                      )}
+                      <span>保存</span>
+                    </button>
                     <button
                       type="button"
-                      onClick={handleSaveTarget}
-                      className="p-1 text-emerald-600 hover:bg-emerald-100 rounded cursor-pointer"
-                      title="保存"
+                      disabled={savingTarget}
+                      onClick={() => {
+                        setCustomTargetInput(targetCalories.toString());
+                        setIsEditingTarget(false);
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer transition-colors"
+                      title="キャンセル"
                     >
-                      <Check className="w-3.5 h-3.5" />
+                      <X className="w-3.5 h-3.5" />
                     </button>
-                  </div>
+                  </form>
                 ) : (
                   <button
                     type="button"
@@ -1191,10 +1393,10 @@ export default function Home() {
                       setCustomTargetInput(targetCalories.toString());
                       setIsEditingTarget(true);
                     }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200/80 rounded-xl transition-all cursor-pointer font-medium"
                     title="目標カロリーを変更"
                   >
-                    <Edit2 className="w-3 h-3" />
+                    <Edit2 className="w-3.5 h-3.5 text-slate-500" />
                     <span>目標を変更</span>
                   </button>
                 )}
@@ -1504,6 +1706,112 @@ export default function Home() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* 📸 写真から自動解析エリア */}
+            <div className="space-y-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png, image/jpeg, image/webp"
+                className="hidden"
+                onChange={handleImageSelect}
+              />
+
+              {!imagePreviewUrl && !analyzingImage ? (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-200 hover:border-emerald-500 bg-slate-50/80 hover:bg-emerald-50/40 rounded-2xl p-4 sm:p-5 text-center transition-all cursor-pointer group"
+                >
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <div className="p-3 bg-white text-emerald-600 rounded-2xl shadow-sm border border-slate-100 group-hover:scale-105 group-hover:text-emerald-700 transition-all">
+                      <Camera className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-800 group-hover:text-emerald-900 text-sm flex items-center justify-center gap-1.5">
+                        <span>写真から自動解析（AI写真判定）</span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">
+                          カメラ / アルバム
+                        </span>
+                      </span>
+                      <span className="text-xs text-slate-400 block mt-0.5">
+                        食事の写真をアップロードすると、AIが料理を自動認識してカロリー・PFCを入力します
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : analyzingImage ? (
+                <div className="border border-emerald-300 bg-emerald-50/60 rounded-2xl p-6 text-center animate-pulse space-y-2">
+                  <RefreshCw className="w-7 h-7 animate-spin text-emerald-600 mx-auto" />
+                  <p className="font-bold text-emerald-950 text-sm">
+                    写真を解析中...
+                  </p>
+                  <p className="text-xs text-emerald-700">
+                    AIが料理とカロリー・PFCを識別・計算しています
+                  </p>
+                </div>
+              ) : (
+                <div className="relative border border-emerald-200/80 bg-emerald-50/40 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-4">
+                  {/* プレビュー画像 */}
+                  <div className="relative w-full sm:w-36 h-36 rounded-xl overflow-hidden shrink-0 bg-slate-100 shadow-sm border border-slate-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imagePreviewUrl!}
+                      alt="アップロードされた食事写真"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/60 text-white text-[10px] rounded font-medium">
+                      プレビュー
+                    </span>
+                  </div>
+
+                  {/* 解析結果バッジと説明 */}
+                  <div className="flex-1 space-y-1.5 text-left w-full">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                        AI写真解析完了
+                        {imageAnalysisInfo?.confidence && (
+                          <span className="font-normal opacity-80">
+                            ({Math.round(imageAnalysisInfo.confidence * 100)}%)
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleClearImage}
+                        className="text-xs text-slate-400 hover:text-rose-600 flex items-center gap-1 cursor-pointer transition-colors"
+                        title="写真を解除"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>写真を解除</span>
+                      </button>
+                    </div>
+
+                    <h4 className="font-bold text-slate-900 text-sm sm:text-base">
+                      {imageAnalysisInfo?.food_name || foodName}
+                    </h4>
+
+                    {imageAnalysisInfo?.note && (
+                      <p className="text-xs text-slate-600">
+                        {imageAnalysisInfo.note}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold underline cursor-pointer"
+                      >
+                        別の写真に変更する
+                      </button>
+                      <span className="text-[11px] text-slate-400">
+                        ・下の各入力欄で数値を微調整できます
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             {/* 食品名入力 & 自動予測ボタン */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">

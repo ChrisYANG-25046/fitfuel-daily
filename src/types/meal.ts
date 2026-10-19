@@ -33,3 +33,19 @@ export interface PresetInsertInput {
   fat?: number | null;
   carbs?: number | null;
 }
+
+export interface UserSettings {
+  id: number | string;
+  target_calories: number;
+  target_protein?: number | null;
+  target_fat?: number | null;
+  target_carbs?: number | null;
+  updated_at?: string;
+}
+
+export interface UserSettingsUpdateInput {
+  target_calories: number;
+  target_protein?: number | null;
+  target_fat?: number | null;
+  target_carbs?: number | null;
+}
