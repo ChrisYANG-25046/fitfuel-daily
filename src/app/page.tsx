@@ -28,554 +28,15 @@ import {
 } from "lucide-react";
 
 // =================================================================
-// 食品栄養素データベース（自動予測・推定用）
+// 食品栄養素データベース & スマート補完エンジン（ローカル・完全無料）
 // =================================================================
-interface FoodNutritionRule {
-  keywords: string[];
-  label: string;
-  calories: number;
-  protein: number;
-  fat: number;
-  carbs: number;
-}
-
-const FOOD_DATABASE: FoodNutritionRule[] = [
-  // フルーツ
-  {
-    keywords: ["りんご", "リンゴ", "林檎", "苹果", "apple"],
-    label: "りんご (1個 約300g)",
-    calories: 95,
-    protein: 0.3,
-    fat: 0.2,
-    carbs: 25.0,
-  },
-  {
-    keywords: ["バナナ", "香蕉", "banana"],
-    label: "バナナ (1本 約100g)",
-    calories: 86,
-    protein: 1.1,
-    fat: 0.2,
-    carbs: 22.5,
-  },
-  {
-    keywords: ["みかん", "ミカン", "蜜柑", "橘子", "orange"],
-    label: "みかん (1個)",
-    calories: 45,
-    protein: 0.7,
-    fat: 0.1,
-    carbs: 11.0,
-  },
-  {
-    keywords: ["アボカド", "牛油果", "鳄梨", "avocado"],
-    label: "アボカド (1/2個)",
-    calories: 140,
-    protein: 1.8,
-    fat: 13.5,
-    carbs: 5.5,
-  },
-  {
-    keywords: ["ブルーベリー", "蓝莓", "blueberry"],
-    label: "ブルーベリー (100g)",
-    calories: 49,
-    protein: 0.6,
-    fat: 0.1,
-    carbs: 13.0,
-  },
-
-  // 主食（炭水化物）
-  {
-    keywords: ["白ご飯", "ご飯", "ごはん", "ライス", "白米", "米饭", "米飯", "rice", "white rice"],
-    label: "白ご飯 (1膳 150g)",
-    calories: 240,
-    protein: 3.8,
-    fat: 0.5,
-    carbs: 53.4,
-  },
-  {
-    keywords: ["玄米ご飯", "玄米", "糙米", "brown rice"],
-    label: "玄米ご飯 (1膳 150g)",
-    calories: 228,
-    protein: 4.2,
-    fat: 1.5,
-    carbs: 51.0,
-  },
-  {
-    keywords: ["オートミール", "燕麦", "oatmeal", "oats"],
-    label: "オートミール (1食 40g)",
-    calories: 152,
-    protein: 5.5,
-    fat: 2.5,
-    carbs: 27.0,
-  },
-  {
-    keywords: ["食パン", "トースト", "パン", "吐司", "面包", "toast", "bread"],
-    label: "食パン (6枚切り 1枚)",
-    calories: 158,
-    protein: 5.6,
-    fat: 2.6,
-    carbs: 28.0,
-  },
-  {
-    keywords: ["パスタ", "スパゲッティ", "意面", "pasta", "spaghetti"],
-    label: "パスタ (乾麺100g調理後)",
-    calories: 360,
-    protein: 13.0,
-    fat: 2.0,
-    carbs: 71.0,
-  },
-  {
-    keywords: ["うどん", "饂飩", "乌冬面", "udon"],
-    label: "うどん (1玉 200g)",
-    calories: 242,
-    protein: 5.2,
-    fat: 0.8,
-    carbs: 53.0,
-  },
-  {
-    keywords: ["そば", "蕎麦", "荞麦面", "soba"],
-    label: "そば (茹で 1人前)",
-    calories: 270,
-    protein: 12.0,
-    fat: 1.8,
-    carbs: 54.0,
-  },
-  {
-    keywords: ["おにぎり", "おむすび", "饭团", "onigiri"],
-    label: "おにぎり (1個)",
-    calories: 180,
-    protein: 3.5,
-    fat: 1.0,
-    carbs: 38.0,
-  },
-  {
-    keywords: ["さつまいも", "サツマイモ", "焼き芋", "红薯", "sweet potato"],
-    label: "さつまいも (1本 150g)",
-    calories: 190,
-    protein: 1.8,
-    fat: 0.3,
-    carbs: 45.0,
-  },
-
-  // 肉・魚（高タンパク質）
-  {
-    keywords: ["サラダチキン", "鸡胸肉沙拉", "salad chicken"],
-    label: "サラダチキン (1パック 110g)",
-    calories: 115,
-    protein: 25.0,
-    fat: 1.5,
-    carbs: 0.0,
-  },
-  {
-    keywords: ["鶏胸肉", "鶏むね肉", "鳥胸肉", "鸡胸肉", "chicken breast"],
-    label: "鶏胸肉・皮なし (100g)",
-    calories: 108,
-    protein: 22.3,
-    fat: 1.5,
-    carbs: 0.0,
-  },
-  {
-    keywords: ["ささみ", "ササミ", "鸡里脊", "chicken tender"],
-    label: "鶏ささみ (100g)",
-    calories: 105,
-    protein: 23.0,
-    fat: 0.8,
-    carbs: 0.0,
-  },
-  {
-    keywords: ["鶏もも肉", "鶏モモ肉", "鸡腿肉", "chicken thigh"],
-    label: "鶏もも肉 (皮なし 100g)",
-    calories: 116,
-    protein: 19.0,
-    fat: 4.0,
-    carbs: 0.0,
-  },
-  {
-    keywords: ["牛肉", "ビーフ", "牛赤身肉", "牛排", "ステーキ", "beef", "steak"],
-    label: "牛赤身肉ステーキ (100g)",
-    calories: 180,
-    protein: 21.5,
-    fat: 9.8,
-    carbs: 0.4,
-  },
-  {
-    keywords: ["豚ヒレ肉", "豚ヒレ", "猪里脊", "pork tenderloin"],
-    label: "豚ヒレ肉 (100g)",
-    calories: 115,
-    protein: 22.8,
-    fat: 1.9,
-    carbs: 0.2,
-  },
-  {
-    keywords: ["豚肉", "ポーク", "豚ロース", "猪肉", "pork"],
-    label: "豚肉・ロース (100g)",
-    calories: 250,
-    protein: 19.3,
-    fat: 19.2,
-    carbs: 0.2,
-  },
-  {
-    keywords: ["鮭", "サケ", "サーモン", "三文鱼", "salmon"],
-    label: "鮭 (1切れ 80g)",
-    calories: 150,
-    protein: 18.0,
-    fat: 7.5,
-    carbs: 0.1,
-  },
-  {
-    keywords: ["サバ", "鯖", "さばの塩焼き", "鲭鱼", "mackerel"],
-    label: "サバ (1切れ 80g)",
-    calories: 200,
-    protein: 16.5,
-    fat: 14.0,
-    carbs: 0.2,
-  },
-  {
-    keywords: ["マグロ", "鮪", "金枪鱼", "tuna"],
-    label: "マグロ赤身 (100g)",
-    calories: 125,
-    protein: 26.4,
-    fat: 1.4,
-    carbs: 0.1,
-  },
-  {
-    keywords: ["エビ", "海老", "えび", "虾", "shrimp"],
-    label: "エビ (100g)",
-    calories: 82,
-    protein: 18.4,
-    fat: 0.3,
-    carbs: 0.3,
-  },
-
-  // 卵・大豆・乳製品
-  {
-    keywords: ["ゆで卵", "ゆでたまご", "煮卵", "水煮蛋", "boiled egg"],
-    label: "ゆで卵 (1個 50g)",
-    calories: 78,
-    protein: 6.5,
-    fat: 5.2,
-    carbs: 0.2,
-  },
-  {
-    keywords: ["目玉焼き", "煎蛋", "fried egg"],
-    label: "目玉焼き (1個)",
-    calories: 95,
-    protein: 6.5,
-    fat: 7.5,
-    carbs: 0.3,
-  },
-  {
-    keywords: ["卵", "たまご", "生卵", "鸡蛋", "egg"],
-    label: "全卵 (1個 50g)",
-    calories: 76,
-    protein: 6.2,
-    fat: 5.2,
-    carbs: 0.2,
-  },
-  {
-    keywords: ["プロテイン", "ホエイプロテイン", "蛋白粉", "protein powder"],
-    label: "ホエイプロテイン (1杯 30g)",
-    calories: 118,
-    protein: 24.0,
-    fat: 1.5,
-    carbs: 2.5,
-  },
-  {
-    keywords: ["プロテインバー", "蛋白棒", "protein bar"],
-    label: "プロテインバー (1本)",
-    calories: 195,
-    protein: 15.0,
-    fat: 8.5,
-    carbs: 15.0,
-  },
-  {
-    keywords: ["納豆", "なっとう", "纳豆", "natto"],
-    label: "納豆 (1パック 45g)",
-    calories: 86,
-    protein: 7.4,
-    fat: 4.5,
-    carbs: 5.4,
-  },
-  {
-    keywords: ["木綿豆腐", "絹ごし豆腐", "豆腐", "tofu"],
-    label: "豆腐 (1/2丁 150g)",
-    calories: 110,
-    protein: 9.8,
-    fat: 6.3,
-    carbs: 2.5,
-  },
-  {
-    keywords: ["ギリシャヨーグルト", "希腊酸奶", "greek yogurt"],
-    label: "ギリシャヨーグルト (1個 100g)",
-    calories: 67,
-    protein: 10.0,
-    fat: 0.2,
-    carbs: 5.0,
-  },
-  {
-    keywords: ["ヨーグルト", "酸奶", "yogurt"],
-    label: "プレーンヨーグルト (100g)",
-    calories: 62,
-    protein: 3.6,
-    fat: 3.0,
-    carbs: 4.9,
-  },
-  {
-    keywords: ["牛乳", "ミルク", "牛奶", "milk"],
-    label: "牛乳 (200ml)",
-    calories: 134,
-    protein: 6.6,
-    fat: 7.6,
-    carbs: 9.6,
-  },
-  {
-    keywords: ["豆乳", "ソイミルク", "豆奶", "soy milk"],
-    label: "無調整豆乳 (200ml)",
-    calories: 95,
-    protein: 7.2,
-    fat: 4.5,
-    carbs: 5.8,
-  },
-  {
-    keywords: ["チーズ", "スライスチーズ", "芝士", "cheese"],
-    label: "スライスチーズ (1枚 18g)",
-    calories: 56,
-    protein: 4.0,
-    fat: 4.6,
-    carbs: 0.2,
-  },
-
-  // 定番料理・外食
-  {
-    keywords: ["サラダ", "野菜サラダ", "沙拉", "salad"],
-    label: "グリーンサラダ (ノンオイル)",
-    calories: 45,
-    protein: 1.5,
-    fat: 0.5,
-    carbs: 7.5,
-  },
-  {
-    keywords: ["味噌汁", "みそ汁", "みそしる", "味噌汤", "miso soup"],
-    label: "味噌汁 (1杯)",
-    calories: 42,
-    protein: 2.8,
-    fat: 1.2,
-    carbs: 4.8,
-  },
-  {
-    keywords: ["カレーライス", "カレー", "咖喱饭", "curry"],
-    label: "カレーライス (1皿)",
-    calories: 750,
-    protein: 16.0,
-    fat: 24.0,
-    carbs: 112.0,
-  },
-  {
-    keywords: ["ラーメン", "拉面", "ramen"],
-    label: "醤油ラーメン (1杯)",
-    calories: 520,
-    protein: 21.0,
-    fat: 18.0,
-    carbs: 68.0,
-  },
-  {
-    keywords: ["牛丼", "牛肉饭", "gyudon"],
-    label: "牛丼 (並盛 1杯)",
-    calories: 720,
-    protein: 20.0,
-    fat: 25.0,
-    carbs: 102.0,
-  },
-  {
-    keywords: ["チャーハン", "炒飯", "炒饭", "fried rice"],
-    label: "チャーハン (1皿)",
-    calories: 620,
-    protein: 15.0,
-    fat: 22.0,
-    carbs: 88.0,
-  },
-  {
-    keywords: ["全粒粉サンド", "サンドイッチ", "サンド", "三明治", "sandwich"],
-    label: "サンドイッチ (1個)",
-    calories: 320,
-    protein: 14.0,
-    fat: 8.0,
-    carbs: 45.0,
-  },
-  {
-    keywords: ["ハンバーガー", "汉堡", "burger"],
-    label: "ハンバーガー (1個)",
-    calories: 420,
-    protein: 18.0,
-    fat: 20.0,
-    carbs: 41.0,
-  },
-  {
-    keywords: ["ピザ", "披萨", "pizza"],
-    label: "ピザ (1切れ)",
-    calories: 260,
-    protein: 11.0,
-    fat: 10.0,
-    carbs: 30.0,
-  },
-  {
-    keywords: ["餃子", "ギョーザ", "ギョウザ", "饺子", "gyoza"],
-    label: "焼き餃子 (5個)",
-    calories: 210,
-    protein: 7.5,
-    fat: 11.0,
-    carbs: 19.0,
-  },
-  {
-    keywords: ["寿司", "にぎり寿司", "寿司", "sushi"],
-    label: "握り寿司 (8貫)",
-    calories: 460,
-    protein: 20.0,
-    fat: 4.5,
-    carbs: 82.0,
-  },
-
-  // 飲み物
-  {
-    keywords: ["ブラックコーヒー", "コーヒー", "珈琲", "黑咖啡", "咖啡", "black coffee", "coffee"],
-    label: "ブラックコーヒー (無糖)",
-    calories: 8,
-    protein: 0.4,
-    fat: 0.0,
-    carbs: 1.4,
-  },
-  {
-    keywords: ["カフェラテ", "ラテ", "拿铁", "latte"],
-    label: "カフェラテ (無糖 200ml)",
-    calories: 105,
-    protein: 5.2,
-    fat: 6.0,
-    carbs: 7.5,
-  },
-  {
-    keywords: ["緑茶", "お茶", "水", "绿茶", "green tea", "water"],
-    label: "お茶・水 (0 kcal)",
-    calories: 0,
-    protein: 0.0,
-    fat: 0.0,
-    carbs: 0.0,
-  },
-];
-
-// 食品名からカロリー・PFCを推定する関数
-function estimateNutrition(input: string): {
-  label: string;
-  calories: number;
-  protein: number;
-  fat: number;
-  carbs: number;
-  isExactOrKnown: boolean;
-} {
-  const query = input.trim().toLowerCase();
-  if (!query) {
-    return {
-      label: "未入力",
-      calories: 0,
-      protein: 0,
-      fat: 0,
-      carbs: 0,
-      isExactOrKnown: false,
-    };
-  }
-
-  // 1. 完全一致チェック
-  for (const item of FOOD_DATABASE) {
-    if (item.keywords.some((k) => k.toLowerCase() === query)) {
-      return {
-        label: item.label,
-        calories: item.calories,
-        protein: item.protein,
-        fat: item.fat,
-        carbs: item.carbs,
-        isExactOrKnown: true,
-      };
-    }
-  }
-
-  // 2. 部分一致チェック（より長いキーワードの一致を優先）
-  let bestMatch: { item: FoodNutritionRule; matchedLen: number } | null = null;
-  for (const item of FOOD_DATABASE) {
-    for (const kw of item.keywords) {
-      const lowerKw = kw.toLowerCase();
-      if (query.includes(lowerKw) || lowerKw.includes(query)) {
-        const len = lowerKw.length;
-        if (!bestMatch || len > bestMatch.matchedLen) {
-          bestMatch = { item, matchedLen: len };
-        }
-      }
-    }
-  }
-
-  if (bestMatch) {
-    return {
-      label: bestMatch.item.label,
-      calories: bestMatch.item.calories,
-      protein: bestMatch.item.protein,
-      fat: bestMatch.item.fat,
-      carbs: bestMatch.item.carbs,
-      isExactOrKnown: true,
-    };
-  }
-
-  // 3. 辞書にない場合のヒューリスティック推定
-  if (/肉|チキン|牛|豚|ささみ|魚|エビ|プロテイン/.test(query)) {
-    return {
-      label: "一般的な肉・魚・高タンパク料理",
-      calories: 200,
-      protein: 20.0,
-      fat: 10.0,
-      carbs: 2.0,
-      isExactOrKnown: false,
-    };
-  }
-
-  if (/飯|ごはん|米|麺|パン|パスタ|うどん|丼/.test(query)) {
-    return {
-      label: "一般的な主食・炭水化物料理",
-      calories: 250,
-      protein: 6.0,
-      fat: 3.0,
-      carbs: 50.0,
-      isExactOrKnown: false,
-    };
-  }
-
-  if (/野菜|サラダ|スープ|味噌汁/.test(query)) {
-    return {
-      label: "一般的な野菜・汁物料理",
-      calories: 60,
-      protein: 2.0,
-      fat: 1.0,
-      carbs: 10.0,
-      isExactOrKnown: false,
-    };
-  }
-
-  if (/茶|水|コーヒー/.test(query)) {
-    return {
-      label: "一般的な無糖飲料",
-      calories: 5,
-      protein: 0.0,
-      fat: 0.0,
-      carbs: 1.0,
-      isExactOrKnown: false,
-    };
-  }
-
-  // 4. デフォルトの標準概算値 (150 kcal)
-  return {
-    label: "標準的な食品",
-    calories: 150,
-    protein: 8.0,
-    fat: 5.0,
-    carbs: 18.0,
-    isExactOrKnown: false,
-  };
-}
+import {
+  FOOD_DATABASE,
+  FoodNutritionRule,
+  POPULAR_FOOD_TAGS,
+  searchFoodSuggestions,
+  estimateNutrition,
+} from "@/data/foodDatabase";
 
 export default function Home() {
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -586,6 +47,12 @@ export default function Home() {
   const [protein, setProtein] = useState("");
   const [fat, setFat] = useState("");
   const [carbs, setCarbs] = useState("");
+
+  // インクリメンタル検索（スマート補完）状態
+  const [suggestions, setSuggestions] = useState<FoodNutritionRule[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const autocompleteContainerRef = useRef<HTMLDivElement>(null);
 
   // 画像アップロード & AI解析状態
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
@@ -756,6 +223,85 @@ export default function Home() {
     };
   }, []);
 
+  // オートコンプリート外側クリック検知
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        autocompleteContainerRef.current &&
+        !autocompleteContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  // 食品名入力時のリアルタイムインクリメンタル検索（スマート補完）
+  const handleFoodNameChange = (val: string) => {
+    setFoodName(val);
+    if (estimateNote) setEstimateNote(null);
+
+    if (val.trim().length >= 1) {
+      const matches = searchFoodSuggestions(val, 8);
+      setSuggestions(matches);
+      setShowSuggestions(matches.length > 0);
+      setSelectedSuggestionIndex(-1);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  // 候補選択（クリックまたはキーボード決定）
+  const handleSelectSuggestion = (item: FoodNutritionRule) => {
+    setFoodName(item.name);
+    setCalories(item.calories.toString());
+    setProtein(item.protein.toString());
+    setFat(item.fat.toString());
+    setCarbs(item.carbs.toString());
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setSelectedSuggestionIndex(-1);
+    setEstimateNote(
+      `✨「${item.label}」のカロリー(${item.calories} kcal)・PFC(P:${item.protein}g F:${item.fat}g C:${item.carbs}g)を自動補完しました（編集可能）`
+    );
+  };
+
+  // 食品名入力欄のキーボードナビゲーション
+  const handleFoodNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showSuggestions && suggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) =>
+          prev < suggestions.length - 1 ? prev + 1 : 0
+        );
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) =>
+          prev > 0 ? prev - 1 : suggestions.length - 1
+        );
+        return;
+      }
+      if (e.key === "Enter" && selectedSuggestionIndex >= 0) {
+        e.preventDefault();
+        handleSelectSuggestion(suggestions[selectedSuggestionIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        setShowSuggestions(false);
+        return;
+      }
+    }
+
+    if (e.key === "Enter" && foodName.trim() && !calories) {
+      e.preventDefault();
+      handleAutoEstimate();
+    }
+  };
+
   // 自動予測ボタン押下時の処理
   const handleAutoEstimate = () => {
     const trimmed = foodName.trim();
@@ -774,6 +320,7 @@ export default function Home() {
     setProtein(result.protein.toString());
     setFat(result.fat.toString());
     setCarbs(result.carbs.toString());
+    setShowSuggestions(false);
 
     if (result.isExactOrKnown) {
       setEstimateNote(
@@ -1727,13 +1274,10 @@ export default function Home() {
                     </div>
                     <div>
                       <span className="font-bold text-slate-800 group-hover:text-emerald-900 text-sm flex items-center justify-center gap-1.5">
-                        <span>写真から自動解析（AI写真判定）</span>
-                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">
-                          カメラ / アルバム
-                        </span>
+                        <span>食事写真のアップロード＆プレビュー</span>
                       </span>
                       <span className="text-xs text-slate-400 block mt-0.5">
-                        食事の写真をアップロードすると、AIが料理を自動認識してカロリー・PFCを入力します
+                        写真を選択するとプレビューが表示され、自動で食品名とPFCを推計します
                       </span>
                     </div>
                   </div>
@@ -1745,7 +1289,7 @@ export default function Home() {
                     写真を解析中...
                   </p>
                   <p className="text-xs text-emerald-700">
-                    AIが料理とカロリー・PFCを識別・計算しています
+                    画像を分析して料理と栄養素を計算しています
                   </p>
                 </div>
               ) : (
@@ -1759,7 +1303,7 @@ export default function Home() {
                       className="w-full h-full object-cover"
                     />
                     <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/60 text-white text-[10px] rounded font-medium">
-                      プレビュー
+                      プレビュー中
                     </span>
                   </div>
 
@@ -1768,7 +1312,7 @@ export default function Home() {
                     <div className="flex items-center justify-between">
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
                         <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                        AI写真解析完了
+                        画像認識プレビュー
                         {imageAnalysisInfo?.confidence && (
                           <span className="font-normal opacity-80">
                             ({Math.round(imageAnalysisInfo.confidence * 100)}%)
@@ -1805,15 +1349,16 @@ export default function Home() {
                         別の写真に変更する
                       </button>
                       <span className="text-[11px] text-slate-400">
-                        ・下の各入力欄で数値を微調整できます
+                        ・各入力欄の数値はいつでも自由に手動微調整できます
                       </span>
                     </div>
                   </div>
                 </div>
               )}
             </div>
-            {/* 食品名入力 & 自動予測ボタン */}
-            <div className="space-y-1.5">
+
+            {/* 食品名入力 & インクリメンタル検索（スマート自動補完） */}
+            <div className="space-y-2" ref={autocompleteContainerRef}>
               <div className="flex items-center justify-between">
                 <label
                   htmlFor="food_name"
@@ -1822,40 +1367,155 @@ export default function Home() {
                   食品名 / 料理名 <span className="text-rose-500">*</span>
                 </label>
                 <span className="text-xs text-slate-400">
-                  入力後に「自動予測」を押すと自動入力されます
+                  リアルタイム候補表示 ＆ PFC自動補完対応
                 </span>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  id="food_name"
-                  type="text"
-                  required
-                  placeholder="例：りんご、白ご飯、鶏胸肉、バナナ、サラダチキン"
-                  value={foodName}
-                  onChange={(e) => {
-                    setFoodName(e.target.value);
-                    if (estimateNote) setEstimateNote(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && foodName.trim() && !calories) {
-                      e.preventDefault();
-                      handleAutoEstimate();
-                    }
-                  }}
-                  className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all text-sm"
-                />
+              <div className="relative">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      id="food_name"
+                      type="text"
+                      required
+                      autoComplete="off"
+                      placeholder="例：牛丼、カレー、プロテイン、サラダ、白ご飯"
+                      value={foodName}
+                      onChange={(e) => handleFoodNameChange(e.target.value)}
+                      onFocus={() => {
+                        if (foodName.trim().length >= 1) {
+                          const matches = searchFoodSuggestions(foodName, 8);
+                          setSuggestions(matches);
+                          setShowSuggestions(matches.length > 0);
+                        }
+                      }}
+                      onKeyDown={handleFoodNameKeyDown}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all text-sm"
+                    />
 
-                <button
-                  type="button"
-                  onClick={handleAutoEstimate}
-                  disabled={!foodName.trim()}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-sm transition-all whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-                  title="食品名からカロリーとPFCを推計して自動入力"
-                >
-                  <Wand2 className="w-4 h-4 text-indigo-200" />
-                  <span>カロリー・PFCを自動予測</span>
-                </button>
+                    {foodName && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFoodName("");
+                          setSuggestions([]);
+                          setShowSuggestions(false);
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full cursor-pointer"
+                        title="入力をクリア"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAutoEstimate}
+                    disabled={!foodName.trim()}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-sm transition-all whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                    title="食品名からカロリーとPFCを推計して自動入力"
+                  >
+                    <Wand2 className="w-4 h-4 text-indigo-200" />
+                    <span>カロリー・PFCを自動予測</span>
+                  </button>
+                </div>
+
+                {/* 🔍 インクリメンタル検索（スマート自動補完ドロップダウン） */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden max-h-80 overflow-y-auto divide-y divide-slate-100">
+                    <div className="px-3.5 py-2 bg-slate-50 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                      <span className="flex items-center gap-1.5 text-emerald-700 font-bold">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                        ローカル辞書候補（タップでPFC自動入力）
+                      </span>
+                      <span className="text-slate-400 text-[10px]">
+                        ↑↓キー選択 / Enter決定
+                      </span>
+                    </div>
+
+                    {suggestions.map((item, idx) => {
+                      const isSelected = idx === selectedSuggestionIndex;
+                      return (
+                        <div
+                          key={`${item.name}-${idx}`}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSelectSuggestion(item);
+                          }}
+                          onMouseEnter={() => setSelectedSuggestionIndex(idx)}
+                          className={`px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
+                            isSelected
+                              ? "bg-emerald-50/90 text-emerald-950"
+                              : "hover:bg-slate-50 text-slate-800"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-2xl shrink-0">
+                              {item.icon || "🍽️"}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm text-slate-900 truncate">
+                                  {item.name}
+                                </span>
+                                <span className="text-[11px] text-slate-400 truncate">
+                                  {item.label}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5 text-xs">
+                                <span className="font-bold text-amber-600">
+                                  {item.calories} kcal
+                                </span>
+                                <span className="text-slate-300">|</span>
+                                <span className="text-blue-600 font-semibold text-[11px]">
+                                  P: {item.protein}g
+                                </span>
+                                <span className="text-amber-600 font-semibold text-[11px]">
+                                  F: {item.fat}g
+                                </span>
+                                <span className="text-orange-600 font-semibold text-[11px]">
+                                  C: {item.carbs}g
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <span className="text-xs font-bold text-emerald-600 px-2 py-1 rounded-md bg-emerald-50 shrink-0">
+                            補完する →
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 定番クイックタグ（ユーザーがワンタップでテスト・入力可能） */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1 mr-1">
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  よく検索される食品:
+                </span>
+                {POPULAR_FOOD_TAGS.map((tag) => (
+                  <button
+                    key={tag.name}
+                    type="button"
+                    onClick={() => {
+                      const matches = searchFoodSuggestions(tag.name, 1);
+                      if (matches.length > 0) {
+                        handleSelectSuggestion(matches[0]);
+                      } else {
+                        setFoodName(tag.name);
+                        handleAutoEstimate();
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200/80 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs"
+                  >
+                    <span>{tag.icon}</span>
+                    <span>{tag.name}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
