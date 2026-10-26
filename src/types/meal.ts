@@ -49,3 +49,6 @@ export interface UserSettingsUpdateInput {
   target_fat?: number | null;
   target_carbs?: number | null;
 }
+
+export * from "./analytics";
+

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, FormEvent } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, FormEvent } from "react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
-import { Meal, Preset, PresetInsertInput } from "@/types/meal";
+import { Meal, Preset, PresetInsertInput, MealInsertInput } from "@/types/meal";
 import {
   Utensils,
   Flame,
@@ -25,7 +25,13 @@ import {
   Settings2,
   Camera,
   X,
+  BarChart3,
+  PieChart,
 } from "lucide-react";
+
+import WeeklyAnalyticsDashboard from "@/components/WeeklyAnalyticsDashboard";
+import { computeWeeklyAnalytics, formatLocalDateKey } from "@/lib/analyticsUtils";
+
 
 // =================================================================
 // 食品栄養素データベース & スマート補完エンジン（ローカル・完全無料）
@@ -41,6 +47,9 @@ import {
 export default function Home() {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [presets, setPresets] = useState<Preset[]>([]);
+
+  // タブ状態: 'logging' (食事記録) | 'analytics' (7日間データ分析)
+  const [activeTab, setActiveTab] = useState<"logging" | "analytics">("logging");
 
   const [foodName, setFoodName] = useState("");
   const [calories, setCalories] = useState("");
@@ -676,6 +685,109 @@ export default function Home() {
     }
   };
 
+  // 5. 過去7日分のデモ用食事データの生成（分析ダッシュボード検証用）
+  const handleSeedSampleWeeklyData = async () => {
+    if (!isSupabaseConfigured) return;
+
+    setLoading(true);
+    const now = new Date();
+
+    const sampleDays = [
+      // 6日前
+      {
+        offset: 6,
+        items: [
+          { food_name: "オートミール (バナナ添え)", calories: 240, protein: 7.0, fat: 3.0, carbs: 50.0 },
+          { food_name: "鶏胸肉グリル & 温野菜", calories: 380, protein: 42.0, fat: 8.0, carbs: 12.0 },
+          { food_name: "鮭の塩焼き定食（玄米・味噌汁）", calories: 580, protein: 32.0, fat: 12.0, carbs: 75.0 },
+          { food_name: "ホエイプロテイン", calories: 118, protein: 24.0, fat: 1.5, carbs: 2.5 },
+        ],
+      },
+      // 5日前
+      {
+        offset: 5,
+        items: [
+          { food_name: "ゆで卵 2個 & トースト", calories: 310, protein: 18.0, fat: 13.0, carbs: 28.0 },
+          { food_name: "牛丼 (並盛 1杯)", calories: 720, protein: 20.0, fat: 25.0, carbs: 102.0 },
+          { food_name: "サラダチキン & グリーンサラダ", calories: 160, protein: 26.5, fat: 2.0, carbs: 7.5 },
+          { food_name: "ギリシャヨーグルト", calories: 67, protein: 10.0, fat: 0.2, carbs: 5.0 },
+        ],
+      },
+      // 4日前
+      {
+        offset: 4,
+        items: [
+          { food_name: "白ご飯 & 納豆 & 目玉焼き", calories: 420, protein: 18.0, fat: 13.0, carbs: 59.0 },
+          { food_name: "豚ヒレ肉の生姜焼き定食", calories: 620, protein: 38.0, fat: 14.0, carbs: 78.0 },
+          { food_name: "サバの塩焼き & 豆腐味噌汁", calories: 360, protein: 29.0, fat: 22.0, carbs: 8.0 },
+        ],
+      },
+      // 3日前 (少しカロリーが高かった日)
+      {
+        offset: 3,
+        items: [
+          { food_name: "ミックスサンドイッチ & カフェラテ", calories: 425, protein: 19.2, fat: 14.0, carbs: 52.5 },
+          { food_name: "カレーライス (並)", calories: 750, protein: 16.0, fat: 24.0, carbs: 112.0 },
+          { food_name: "鶏の唐揚げ (4個)", calories: 320, protein: 22.0, fat: 20.0, carbs: 12.0 },
+          { food_name: "ホエイプロテイン", calories: 118, protein: 24.0, fat: 1.5, carbs: 2.5 },
+        ],
+      },
+      // 2日前
+      {
+        offset: 2,
+        items: [
+          { food_name: "オートミールボウル", calories: 280, protein: 10.5, fat: 4.8, carbs: 48.0 },
+          { food_name: "和風ハンバーグ定食", calories: 680, protein: 32.0, fat: 26.0, carbs: 72.0 },
+          { food_name: "マグロ赤身刺身 & 味噌汁", calories: 210, protein: 39.0, fat: 2.6, carbs: 5.0 },
+          { food_name: "ホエイプロテイン", calories: 118, protein: 24.0, fat: 1.5, carbs: 2.5 },
+        ],
+      },
+      // 1日前 (昨日)
+      {
+        offset: 1,
+        items: [
+          { food_name: "食パン & 目玉焼き & カフェラテ", calories: 358, protein: 17.3, fat: 16.1, carbs: 35.8 },
+          { food_name: "親子丼", calories: 650, protein: 28.0, fat: 16.0, carbs: 95.0 },
+          { food_name: "牛赤身ステーキと温野菜", calories: 380, protein: 36.0, fat: 14.0, carbs: 12.0 },
+          { food_name: "ホエイプロテイン", calories: 118, protein: 24.0, fat: 1.5, carbs: 2.5 },
+        ],
+      },
+    ];
+
+    const recordsToInsert: Array<MealInsertInput & { created_at: string }> = [];
+
+    sampleDays.forEach((dayData) => {
+      dayData.items.forEach((item, idx) => {
+        const d = new Date(now);
+        d.setDate(d.getDate() - dayData.offset);
+        d.setHours(8 + idx * 4, 15 + idx * 5, 0, 0);
+        recordsToInsert.push({
+          ...item,
+          created_at: d.toISOString(),
+        });
+      });
+    });
+
+    try {
+      const { error } = await supabase.from("meals").insert(recordsToInsert);
+      if (error) throw error;
+      await fetchMeals();
+      setStatusMessage({
+        type: "success",
+        text: `📊 過去7日分のデモ用食事データ（${recordsToInsert.length}件）を投入しました！7日間の推移グラフが更新されました。`,
+      });
+    } catch (err: unknown) {
+      const error = err as Error;
+      setStatusMessage({
+        type: "error",
+        text: `デモデータの投入に失敗しました: ${error.message}`,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   // （補助機能）食事記録の削除
   const handleDelete = async (id: number | string) => {
     if (!isSupabaseConfigured) return;
@@ -767,17 +879,30 @@ export default function Home() {
     }
   };
 
-  // 合計値の算出
-  const totalCalories = meals.reduce((sum, item) => sum + (item.calories || 0), 0);
-  const totalProtein = meals.reduce((sum, item) => sum + Number(item.protein || 0), 0);
-  const totalFat = meals.reduce((sum, item) => sum + Number(item.fat || 0), 0);
-  const totalCarbs = meals.reduce((sum, item) => sum + Number(item.carbs || 0), 0);
+  // 7日間の週次分析データ（過去7日間の日別推移・PFCバランス）
+  const weeklyAnalytics = useMemo(() => {
+    return computeWeeklyAnalytics(meals, targetCalories);
+  }, [meals, targetCalories]);
+
+  // 今日の食事を抽出（ローカル日付基準）
+  const todayKey = formatLocalDateKey(new Date());
+  const todayMeals = meals.filter((item) => {
+    if (!item.created_at) return true;
+    return formatLocalDateKey(new Date(item.created_at)) === todayKey;
+  });
+
+  // 本日の合計値（進捗バーおよびPFCカード用。当日の記録がない場合は過去直近または全体フォールバック）
+  const totalCalories = todayMeals.reduce((sum, item) => sum + (item.calories || 0), 0);
+  const totalProtein = todayMeals.reduce((sum, item) => sum + Number(item.protein || 0), 0);
+  const totalFat = todayMeals.reduce((sum, item) => sum + Number(item.fat || 0), 0);
+  const totalCarbs = todayMeals.reduce((sum, item) => sum + Number(item.carbs || 0), 0);
 
   // 進捗率（%）
   const progressRatio = targetCalories > 0 ? (totalCalories / targetCalories) * 100 : 0;
   const progressPercentage = Math.round(progressRatio);
   const isOverTarget = totalCalories > targetCalories;
   const remainingCalories = Math.max(0, targetCalories - totalCalories);
+
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 py-10 px-4 sm:px-6 lg:px-8">
@@ -866,28 +991,78 @@ export default function Home() {
         )}
 
         {/* ========================================================= */}
-        {/* 目標進捗バー & PFC合計サマリーカードエリア */}
+        {/* タブナビゲーション（食事記録 / 7日間データ分析） */}
         {/* ========================================================= */}
-        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8 space-y-6">
-          {/* 目標カロリー進捗ヘッダー */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-                  <Target className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">
-                    1日のカロリー目標進捗
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    目標: {targetCalories.toLocaleString()} kcal に対する進捗度
-                  </p>
-                </div>
-              </div>
+        <div className="flex items-center justify-center p-1.5 bg-slate-200/80 rounded-2xl max-w-md mx-auto shadow-inner">
+          <button
+            type="button"
+            onClick={() => setActiveTab("logging")}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeTab === "logging"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
+            }`}
+          >
+            <Utensils className="w-4 h-4 text-emerald-600" />
+            <span>食事の記録</span>
+          </button>
 
-              {/* 目標値変更エリア */}
-              <div className="flex items-center gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab("analytics")}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeTab === "analytics"
+                ? "bg-white text-indigo-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 text-indigo-600" />
+            <span>7日間データ分析</span>
+            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+          </button>
+        </div>
+
+        {activeTab === "analytics" ? (
+          <WeeklyAnalyticsDashboard
+            analytics={weeklyAnalytics}
+            onRefresh={fetchMeals}
+            onSeedSampleData={handleSeedSampleWeeklyData}
+            loading={loading}
+          />
+        ) : (
+          <div className="space-y-8">
+            {/* ========================================================= */}
+            {/* 目標進捗バー & PFC合計サマリーカードエリア */}
+            {/* ========================================================= */}
+            <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8 space-y-6">
+              {/* 目標カロリー進捗ヘッダー */}
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                      <Target className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900">
+                        1日のカロリー目標進捗 (本日分)
+                      </h2>
+                      <p className="text-xs text-slate-500">
+                        目標: {targetCalories.toLocaleString()} kcal に対する進捗度
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("analytics")}
+                      className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-semibold bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer"
+                    >
+                      <BarChart3 className="w-3.5 h-3.5" />
+                      <span>7日間推移グラフを見る</span>
+                    </button>
+
+                    {/* 目標値変更エリア */}
+                    <div className="flex items-center gap-2 text-xs">
                 {isEditingTarget ? (
                   <form
                     onSubmit={(e) => {
@@ -949,8 +1124,9 @@ export default function Home() {
                 )}
               </div>
             </div>
+          </div>
 
-            {/* 進捗数値表示 */}
+          {/* 進捗数値表示 */}
             <div className="flex items-baseline justify-between pt-1">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -1797,6 +1973,20 @@ export default function Home() {
             </div>
           )}
         </div>
+
+        {/* ========================================================= */}
+        {/* 画面下部の7日間データ分析ダッシュボードセクション */}
+        {/* ========================================================= */}
+        <div id="weekly-analytics-section" className="pt-4 border-t border-slate-200/80">
+          <WeeklyAnalyticsDashboard
+            analytics={weeklyAnalytics}
+            onRefresh={fetchMeals}
+            onSeedSampleData={handleSeedSampleWeeklyData}
+            loading={loading}
+          />
+        </div>
+      </div>
+    )}
 
         {/* フッター */}
         <footer className="text-center text-xs text-slate-400 pt-4 pb-8 space-y-1">
