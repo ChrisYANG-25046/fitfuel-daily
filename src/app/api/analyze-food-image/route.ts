@@ -1,193 +1,78 @@
-import { NextRequest, NextResponse } from "next/server";
-import { searchFoodSuggestions, FOOD_DATABASE, FoodNutritionRule } from "@/data/foodDatabase";
+import { NextResponse } from "next/server";
 
-interface FoodAnalysisResult {
-  food_name: string;
-  calories: number;
-  protein: number;
-  fat: number;
-  carbs: number;
-  confidence: number;
-  note?: string;
-  source: "local_smart_engine" | "gemini_vision" | "openai_vision";
-}
+// 1. 基礎食材辞書（包含主食、肉类/海鲜、常见日本超市蔬菜）
+const BASE_INGREDIENTS = [
+  // --- 主食 (Staples) ---
+  { keywords: [/rice|ご飯|ライス|米|白米/i], name: "白ご飯 (150g)", calories: 240, protein: 3.8, fat: 0.5, carbs: 55.0 },
+  { keywords: [/noodle|ramen|udon|soba|麺|ラーメン|うどん|そば|パスタ|面/i], name: "麺類/パスタ (200g)", calories: 350, protein: 9.0, fat: 2.0, carbs: 70.0 },
+  { keywords: [/bread|toast|パン|トースト/i], name: "食パン (60g)", calories: 160, protein: 6.0, fat: 2.5, carbs: 28.0 },
 
-// 代表的な食事推定プール（有料API不要・完全ローカル動作）
-const LOCAL_PRESET_MEALS: {
-  food_name: string;
-  calories: number;
-  protein: number;
-  fat: number;
-  carbs: number;
-  confidence: number;
-  note: string;
-}[] = [
-  {
-    food_name: "牛丼 (並盛 1杯)",
-    calories: 720,
-    protein: 20.0,
-    fat: 25.0,
-    carbs: 102.0,
-    confidence: 0.94,
-    note: "牛肉と玉ねぎの甘辛煮。主食とタンパク質をバランスよく摂取できます。",
-  },
-  {
-    food_name: "カレーライス (1皿)",
-    calories: 750,
-    protein: 16.0,
-    fat: 24.0,
-    carbs: 112.0,
-    confidence: 0.93,
-    note: "エネルギー補給に適した定番カレー。PFCバランスの確認をおすすめします。",
-  },
-  {
-    food_name: "ホエイプロテイン (1杯 30g)",
-    calories: 118,
-    protein: 24.0,
-    fat: 1.5,
-    carbs: 2.5,
-    confidence: 0.96,
-    note: "高純度タンパク質補給。筋肉の合成とリカバリーに最適です。",
-  },
-  {
-    food_name: "グリーンサラダ (ノンオイル)",
-    calories: 45,
-    protein: 1.5,
-    fat: 0.5,
-    carbs: 7.5,
-    confidence: 0.95,
-    note: "食物繊維とビタミン豊富な低カロリーサラダです。",
-  },
-  {
-    food_name: "サラダチキン (1パック 110g)",
-    calories: 115,
-    protein: 25.0,
-    fat: 1.5,
-    carbs: 0.0,
-    confidence: 0.95,
-    note: "高タンパク・低脂質なチキン胸肉。減量中の筋量維持に最適です。",
-  },
-  {
-    food_name: "鮭の塩焼き定食（玄米・味噌汁付き）",
-    calories: 460,
-    protein: 26.0,
-    fat: 11.5,
-    carbs: 58.0,
-    confidence: 0.92,
-    note: "良質なオメガ3脂肪酸を含む鮭と主食のバランスが良好です。",
-  },
-  {
-    food_name: "牛赤身肉ステーキ (100g)",
-    calories: 180,
-    protein: 21.5,
-    fat: 9.8,
-    carbs: 0.4,
-    confidence: 0.91,
-    note: "筋肉維持に適した赤身肉の組み合わせです。",
-  },
-  {
-    food_name: "オートミールボウル（フルーツ添え）",
-    calories: 220,
-    protein: 7.5,
-    fat: 3.5,
-    carbs: 42.0,
-    confidence: 0.93,
-    note: "低GIな複合炭水化物とビタミンを補給できます。",
-  },
-  {
-    food_name: "ゆで卵と全粒粉トースト",
-    calories: 236,
-    protein: 12.1,
-    fat: 7.8,
-    carbs: 28.2,
-    confidence: 0.94,
-    note: "完全栄養食の卵と全粒粉トーストのヘルシープレートです。",
-  },
+  // --- 肉类 & 海鲜 (Proteins) ---
+  { keywords: [/chicken|チキン|鶏|胸肉|むね肉|ささみ|鶏肉/i], name: "鶏肉/サラダチキン (100g)", calories: 110, protein: 23.0, fat: 1.5, carbs: 0.0 },
+  { keywords: [/beef|gyu|牛|牛肉|ステーキ/i], name: "牛肉 (100g)", calories: 250, protein: 20.0, fat: 18.0, carbs: 0.5 },
+  { keywords: [/pork|豚|豚肉|ポーク/i], name: "豚肉 (100g)", calories: 220, protein: 19.0, fat: 15.0, carbs: 0.2 },
+  { keywords: [/fish|salmon|tuna|魚|鮭|サーモン|マグロ|刺身/i], name: "魚介類平均 (100g)", calories: 140, protein: 20.0, fat: 6.0, carbs: 0.0 },
+  { keywords: [/shrimp|prawn|エビ|えび|海老/i], name: "エビ (100g)", calories: 90, protein: 20.0, fat: 0.5, carbs: 0.0 },
+  { keywords: [/egg|tamago|卵|たまご|玉子/i], name: "全卵 (1個 50g)", calories: 80, protein: 6.5, fat: 5.5, carbs: 0.2 },
+
+  // --- 日本超市常见蔬菜 (Vegetables) ---
+  { keywords: [/tomato|トマト|西紅柿/i], name: "トマト (1個 150g)", calories: 30, protein: 1.0, fat: 0.2, carbs: 7.0 },
+  { keywords: [/cabbage|キャベツ|白菜|はくさい/i], name: "キャベツ/白菜 (100g)", calories: 20, protein: 1.3, fat: 0.1, carbs: 4.5 },
+  { keywords: [/broccoli|cauliflower|ブロッコリー|花菜/i], name: "ブロッコリー (100g)", calories: 33, protein: 4.3, fat: 0.5, carbs: 5.2 },
+  { keywords: [/carrot|人参|にんじん|胡蘿蔔/i], name: "ニンジン (100g)", calories: 35, protein: 0.8, fat: 0.2, carbs: 8.5 },
+  { keywords: [/eggplant|ナス|茄子/i], name: "ナス (1個 80g)", calories: 18, protein: 0.9, fat: 0.1, carbs: 4.1 },
 ];
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const formData = await req.formData();
-    const imageFile = formData.get("image") as File | null;
+    // "file" または "image" からファイルを取得
+    const file = (formData.get("file") || formData.get("image")) as File | null;
 
-    if (!imageFile) {
+    if (!file) {
       return NextResponse.json(
-        { error: "画像ファイルが送信されていません" },
+        { success: false, error: "画像ファイルが送信されていません" },
         { status: 400 }
       );
     }
 
-    const mimeType = imageFile.type || "image/jpeg";
-    const fileName = (imageFile.name || "").toLowerCase();
-    const buffer = Buffer.from(await imageFile.arrayBuffer());
+    const fileName = (file.name || "").toLowerCase();
 
-    // 1. ファイル名からローカルデータベースを検索（外部有料API不要）
-    const cleanFileName = fileName.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-    const matches = searchFoodSuggestions(cleanFileName, 1);
+    // 基礎食材辞書からマッチする食材を検索
+    const matched = BASE_INGREDIENTS.find((item) =>
+      item.keywords.some((regex) => regex.test(fileName))
+    );
 
-    if (matches.length > 0) {
-      const match = matches[0];
+    // 一致した場合は該当の基礎食材栄養データを返却
+    if (matched) {
       return NextResponse.json({
         success: true,
+        matched: true,
         data: {
-          food_name: match.name,
-          calories: match.calories,
-          protein: match.protein,
-          fat: match.fat,
-          carbs: match.carbs,
-          confidence: 0.96,
-          note: `「${match.label}」の栄養データを自動セットしました。`,
-          source: "local_smart_engine",
+          food_name: matched.name,
+          calories: matched.calories,
+          protein: matched.protein,
+          fat: matched.fat,
+          carbs: matched.carbs,
+          confidence: 0.95,
+          note: `「${matched.name}」の栄養データを自動セットしました。`,
+          source: "base_ingredients_master",
         },
       });
     }
 
-    // 2. 特徴キーワード判定（牛丼、カレー、プロテイン、サラダ、チキン等）
-    let matchedItem: (typeof LOCAL_PRESET_MEALS)[number] | null = null;
-
-    if (/gyudon|牛丼|牛めし|beef/i.test(fileName)) {
-      matchedItem = LOCAL_PRESET_MEALS[0]; // 牛丼
-    } else if (/curry|カレー|かれー/i.test(fileName)) {
-      matchedItem = LOCAL_PRESET_MEALS[1]; // カレーライス
-    } else if (/protein|プロテイン|shake/i.test(fileName)) {
-      matchedItem = LOCAL_PRESET_MEALS[2]; // プロテイン
-    } else if (/salad|サラダ|さらだ|vegetable/i.test(fileName)) {
-      matchedItem = LOCAL_PRESET_MEALS[3]; // サラダ
-    } else if (/chicken|チキン|胸肉|むね肉|サラダチキン/i.test(fileName)) {
-      matchedItem = LOCAL_PRESET_MEALS[4]; // サラダチキン
-    } else if (/salmon|サーモン|鮭|fish|魚/i.test(fileName)) {
-      matchedItem = LOCAL_PRESET_MEALS[5]; // 鮭
-    } else if (/beef|steak|ステーキ|肉/i.test(fileName)) {
-      matchedItem = LOCAL_PRESET_MEALS[6]; // ステーキ
-    } else if (/oat|oatmeal|オートミール/i.test(fileName)) {
-      matchedItem = LOCAL_PRESET_MEALS[7]; // オートミール
-    } else if (/egg|tamago|卵|たまご|toast|パン/i.test(fileName)) {
-      matchedItem = LOCAL_PRESET_MEALS[8]; // 卵・トースト
-    } else {
-      // 画像バイナリのハッシュ値から決定論的にプリセット候補を選択
-      const hashVal = buffer.reduce((acc, byte, idx) => (idx % 7 === 0 ? acc + byte : acc), 0);
-      const chosenIndex = hashVal % LOCAL_PRESET_MEALS.length;
-      matchedItem = LOCAL_PRESET_MEALS[chosenIndex];
-    }
-
+    // 特定できない場合はランダム割り当てを廃止し、matched: false でスキップ
     return NextResponse.json({
       success: true,
-      data: {
-        food_name: matchedItem.food_name,
-        calories: matchedItem.calories,
-        protein: matchedItem.protein,
-        fat: matchedItem.fat,
-        carbs: matchedItem.carbs,
-        confidence: matchedItem.confidence,
-        note: matchedItem.note,
-        source: "local_smart_engine",
-      },
+      matched: false,
+      data: null,
+      message: "食材を自動特定できませんでした。手動で食品名・カロリー・PFCを入力してください。",
     });
   } catch (error: unknown) {
     const err = error as Error;
     console.error("画像解析エラー:", err);
     return NextResponse.json(
-      { error: `画像解析に失敗しました: ${err.message}` },
+      { success: false, error: `画像解析に失敗しました: ${err.message}` },
       { status: 500 }
     );
   }

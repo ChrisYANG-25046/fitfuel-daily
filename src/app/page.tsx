@@ -70,6 +70,7 @@ export default function Home() {
     food_name: string;
     confidence: number;
     note?: string;
+    matched?: boolean;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -364,6 +365,7 @@ export default function Home() {
 
     try {
       const formData = new FormData();
+      formData.append("file", file);
       formData.append("image", file);
 
       const res = await fetch("/api/analyze-food-image", {
@@ -374,6 +376,21 @@ export default function Home() {
       const json = await res.json();
       if (!res.ok || !json.success) {
         throw new Error(json.error || "画像解析に失敗しました");
+      }
+
+      // 食材が特定できなかった場合（スキップ処理: matched: false / 手動入力モード維持）
+      if (json.matched === false || !json.data) {
+        setImageAnalysisInfo({
+          food_name: "手動入力",
+          confidence: 0,
+          note: json.message || "食材を特定できませんでした。手動で食品名・カロリー・PFCを入力してください。",
+          matched: false,
+        });
+        setStatusMessage({
+          type: "success",
+          text: "📸 写真をプレビュー表示しました。食材名と栄養素を手動でご入力ください。",
+        });
+        return;
       }
 
       const { food_name, calories, protein, fat, carbs, confidence, note } =
@@ -390,11 +407,12 @@ export default function Home() {
         food_name,
         confidence,
         note,
+        matched: true,
       });
 
       setStatusMessage({
         type: "success",
-        text: `📸 写真から「${food_name}」（${calories} kcal）をAI解析・自動セットしました！`,
+        text: `📸 写真から「${food_name}」（${calories} kcal）を認識・自動セットしました！`,
       });
     } catch (err: unknown) {
       const error = err as Error;
@@ -1486,14 +1504,29 @@ export default function Home() {
                   {/* 解析結果バッジと説明 */}
                   <div className="flex-1 space-y-1.5 text-left w-full">
                     <div className="flex items-center justify-between">
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                        画像認識プレビュー
-                        {imageAnalysisInfo?.confidence && (
+                      <span
+                        className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${
+                          imageAnalysisInfo?.matched === false
+                            ? "text-slate-700 bg-slate-200"
+                            : "text-emerald-800 bg-emerald-100"
+                        }`}
+                      >
+                        <Sparkles
+                          className={`w-3.5 h-3.5 ${
+                            imageAnalysisInfo?.matched === false
+                              ? "text-slate-500"
+                              : "text-emerald-600"
+                          }`}
+                        />
+                        {imageAnalysisInfo?.matched === false
+                          ? "手動入力モード（未特定）"
+                          : "基礎食材マッチ完了"}
+                        {imageAnalysisInfo?.matched !== false &&
+                        imageAnalysisInfo?.confidence ? (
                           <span className="font-normal opacity-80">
                             ({Math.round(imageAnalysisInfo.confidence * 100)}%)
                           </span>
-                        )}
+                        ) : null}
                       </span>
                       <button
                         type="button"
@@ -1507,7 +1540,9 @@ export default function Home() {
                     </div>
 
                     <h4 className="font-bold text-slate-900 text-sm sm:text-base">
-                      {imageAnalysisInfo?.food_name || foodName}
+                      {imageAnalysisInfo?.matched === false
+                        ? foodName || "未入力（手動で食品名を入力してください）"
+                        : imageAnalysisInfo?.food_name || foodName}
                     </h4>
 
                     {imageAnalysisInfo?.note && (
