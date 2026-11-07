@@ -859,7 +859,7 @@ export function searchFoodSuggestions(query: string, limit = 8): FoodNutritionRu
 }
 
 // =================================================================
-// 食品名からカロリー・PFCを自動予測する関数
+// 食品名からカロリー・PFCを自動予測する関数（数量・重量解析エンジン対応）
 // =================================================================
 export function estimateNutrition(input: string): {
   food_name: string;
@@ -871,6 +871,79 @@ export function estimateNutrition(input: string): {
   isExactOrKnown: boolean;
   icon: string;
 } {
+  const query = input.trim();
+  if (!query) {
+    return {
+      food_name: "未入力",
+      label: "未入力",
+      calories: 0,
+      protein: 0,
+      fat: 0,
+      carbs: 0,
+      isExactOrKnown: false,
+      icon: "🍽️",
+    };
+  }
+
+  // 1. 数量・重量解析（自然言語換算エンジン）
+  // --- グラムベース (100gあたり) ---
+  const weightDb = [
+    { keywords: [/beef|牛|牛肉|ステーキ/i], name: "牛肉", per100g: { cal: 250, p: 20.0, f: 18.0, c: 0.5 }, icon: "🥩" },
+    { keywords: [/chicken|チキン|鶏|胸肉|むね肉|ささみ/i], name: "鶏肉/サラダチキン", per100g: { cal: 110, p: 23.0, f: 1.5, c: 0.0 }, icon: "🍗" },
+    { keywords: [/pork|豚|豚肉|ポーク/i], name: "豚肉", per100g: { cal: 220, p: 19.0, f: 15.0, c: 0.2 }, icon: "🥩" },
+    { keywords: [/fish|salmon|魚|鮭|サーモン|マグロ|刺身/i], name: "魚介類", per100g: { cal: 140, p: 20.0, f: 6.0, c: 0.0 }, icon: "🐟" },
+    { keywords: [/rice|ご飯|ライス|米|白米/i], name: "白ご飯", per100g: { cal: 160, p: 2.5, f: 0.3, c: 37.0 }, icon: "🍚" },
+    { keywords: [/noodle|ramen|udon|麺|ラーメン|うどん|そば|パスタ/i], name: "麺類", per100g: { cal: 175, p: 4.5, f: 1.0, c: 35.0 }, icon: "🍜" },
+  ];
+
+  // --- 個数ベース (1個/1つあたり) ---
+  const countDb = [
+    { keywords: [/egg|tamago|卵|たまご|玉子/i], name: "卵", perPiece: { cal: 80, p: 6.5, f: 5.5, c: 0.2 }, defaultCount: 1, icon: "🥚" },
+    { keywords: [/bread|toast|パン|トースト/i], name: "食パン", perPiece: { cal: 160, p: 6.0, f: 2.5, c: 28.0 }, defaultCount: 1, icon: "🍞" },
+  ];
+
+  // グラム表記または個数表記が含まれているかチェック
+  const hasWeight = /(\d+(?:\.\d+)?)\s*(g|グラム|個)?/i.test(query);
+  const hasCount = /(\d+(?:\.\d+)?)\s*(個|つ|個入)/i.test(query);
+
+  // 個数ベース照合
+  for (const item of countDb) {
+    if (item.keywords.some((r) => r.test(query))) {
+      const countMatch = query.match(/(\d+(?:\.\d+)?)\s*(個|つ|個入)?/i);
+      const count = countMatch ? parseFloat(countMatch[1]) : (item.defaultCount || 1);
+      return {
+        food_name: `${item.name} (${count}個)`,
+        label: `${item.name} (${count}個)`,
+        calories: Math.round(item.perPiece.cal * count),
+        protein: parseFloat((item.perPiece.p * count).toFixed(1)),
+        fat: parseFloat((item.perPiece.f * count).toFixed(1)),
+        carbs: parseFloat((item.perPiece.c * count).toFixed(1)),
+        isExactOrKnown: true,
+        icon: item.icon,
+      };
+    }
+  }
+
+  // グラムベース照合
+  for (const item of weightDb) {
+    if (item.keywords.some((r) => r.test(query))) {
+      const weightMatch = query.match(/(\d+(?:\.\d+)?)\s*(g|グラム|個)?/i);
+      const grams = weightMatch ? parseFloat(weightMatch[1]) : 100;
+      const ratio = grams / 100;
+      return {
+        food_name: `${item.name} (${grams}g)`,
+        label: `${item.name} (${grams}g)`,
+        calories: Math.round(item.per100g.cal * ratio),
+        protein: parseFloat((item.per100g.p * ratio).toFixed(1)),
+        fat: parseFloat((item.per100g.f * ratio).toFixed(1)),
+        carbs: parseFloat((item.per100g.c * ratio).toFixed(1)),
+        isExactOrKnown: true,
+        icon: item.icon,
+      };
+    }
+  }
+
+  // 2. 通常のローカル辞書検索
   const matches = searchFoodSuggestions(input, 1);
   if (matches.length > 0) {
     const matched = matches[0];
@@ -886,9 +959,8 @@ export function estimateNutrition(input: string): {
     };
   }
 
-  const query = input.trim();
+  // 3. ヒューリスティック推定
 
-  // ヒューリスティック推定
   if (/肉|チキン|牛|豚|ささみ|魚|エビ|サーモン|プロテイン/i.test(query)) {
     return {
       food_name: query,
