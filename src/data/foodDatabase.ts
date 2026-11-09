@@ -886,31 +886,43 @@ export function estimateNutrition(input: string): {
   }
 
   // 1. 数量・重量解析（自然言語換算エンジン）
+  // 日本大型スーパー定番生鮮・果物・魚介・肉類精細データベース
   // --- グラムベース (100gあたり) ---
   const weightDb = [
-    { keywords: [/beef|牛|牛肉|ステーキ/i], name: "牛肉", per100g: { cal: 250, p: 20.0, f: 18.0, c: 0.5 }, icon: "🥩" },
-    { keywords: [/chicken|チキン|鶏|胸肉|むね肉|ささみ/i], name: "鶏肉/サラダチキン", per100g: { cal: 110, p: 23.0, f: 1.5, c: 0.0 }, icon: "🍗" },
-    { keywords: [/pork|豚|豚肉|ポーク/i], name: "豚肉", per100g: { cal: 220, p: 19.0, f: 15.0, c: 0.2 }, icon: "🥩" },
-    { keywords: [/fish|salmon|魚|鮭|サーモン|マグロ|刺身/i], name: "魚介類", per100g: { cal: 140, p: 20.0, f: 6.0, c: 0.0 }, icon: "🐟" },
-    { keywords: [/rice|ご飯|ライス|米|白米/i], name: "白ご飯", per100g: { cal: 160, p: 2.5, f: 0.3, c: 37.0 }, icon: "🍚" },
+    { keywords: [/grape|ぶどう|ブドウ|葡萄/i], name: "ぶどう", per100g: { cal: 59, p: 0.4, f: 0.1, c: 15.2 }, icon: "🍇" },
+    { keywords: [/chicken|チキン|鶏|胸肉|むね肉|ささみ|鶏肉/i], name: "鶏むね肉/ささみ", per100g: { cal: 108, p: 23.3, f: 1.5, c: 0.0 }, icon: "🍗" },
+    { keywords: [/thigh|もも肉|鶏もも/i], name: "鶏もも肉", per100g: { cal: 190, p: 16.6, f: 14.2, c: 0.0 }, icon: "🍗" },
+    { keywords: [/beef|牛|牛肉|ステーキ/i], name: "牛肉 (赤身/バラ平均)", per100g: { cal: 240, p: 18.0, f: 17.5, c: 0.4 }, icon: "🥩" },
+    { keywords: [/pork|豚|豚肉|ポーク|ロース/i], name: "豚肉", per100g: { cal: 210, p: 19.3, f: 14.7, c: 0.2 }, icon: "🥩" },
+    { keywords: [/salmon|鮭|サーモン|三文鱼/i], name: "鮭/サーモン", per100g: { cal: 170, p: 20.1, f: 9.4, c: 0.1 }, icon: "🐟" },
+    { keywords: [/tuna|マグロ|まぐろ|金枪鱼/i], name: "マグロ (赤身)", per100g: { cal: 115, p: 26.4, f: 1.4, c: 0.1 }, icon: "🐟" },
+    { keywords: [/mackerel|サバ|さば|青魚|鯖/i], name: "サバ", per100g: { cal: 210, p: 20.6, f: 16.8, c: 0.3 }, icon: "🐟" },
+    { keywords: [/shrimp|prawn|エビ|えび|海老/i], name: "エビ", per100g: { cal: 82, p: 18.4, f: 0.6, c: 0.3 }, icon: "🦐" },
+    { keywords: [/squid|イカ|いか|乌贼|鱿鱼/i], name: "イカ", per100g: { cal: 76, p: 17.9, f: 0.8, c: 0.1 }, icon: "🦑" },
+    { keywords: [/octopus|タコ|たこ|章鱼/i], name: "タコ", per100g: { cal: 70, p: 16.4, f: 0.7, c: 0.1 }, icon: "🐙" },
+    { keywords: [/rice|ご飯|ライス|米|白米/i], name: "白ご飯", per100g: { cal: 156, p: 2.5, f: 0.3, c: 35.6 }, icon: "🍚" },
     { keywords: [/noodle|ramen|udon|麺|ラーメン|うどん|そば|パスタ/i], name: "麺類", per100g: { cal: 175, p: 4.5, f: 1.0, c: 35.0 }, icon: "🍜" },
   ];
 
-  // --- 個数ベース (1個/1つあたり) ---
+  // --- 個数ベース (1個/1本/1粒/1枚あたり) ---
   const countDb = [
-    { keywords: [/egg|tamago|卵|たまご|玉子/i], name: "卵", perPiece: { cal: 80, p: 6.5, f: 5.5, c: 0.2 }, defaultCount: 1, icon: "🥚" },
-    { keywords: [/bread|toast|パン|トースト/i], name: "食パン", perPiece: { cal: 160, p: 6.0, f: 2.5, c: 28.0 }, defaultCount: 1, icon: "🍞" },
+    { keywords: [/kiwi|キウイ|奇异果|弥生/i], name: "キウイフルーツ", perPiece: { cal: 53, p: 1.0, f: 0.1, c: 13.5 }, icon: "🥝" },
+    { keywords: [/apple|りんご|リンゴ|苹果/i], name: "りんご", perPiece: { cal: 138, p: 0.5, f: 0.3, c: 38.0 }, icon: "🍎" },
+    { keywords: [/banana|バナナ|香蕉/i], name: "バナナ", perPiece: { cal: 86, p: 1.1, f: 0.2, c: 22.5 }, icon: "🍌" },
+    { keywords: [/orange|mikan|みかん|ミカン|桔子|橙子/i], name: "みかん/オレンジ", perPiece: { cal: 45, p: 0.7, f: 0.1, c: 11.0 }, icon: "🍊" },
+    { keywords: [/strawberry|いちご|イチゴ|草莓/i], name: "いちご", perPiece: { cal: 5, p: 0.1, f: 0.0, c: 1.2 }, icon: "🍓" },
+    { keywords: [/avocado|アボカド|牛油果/i], name: "アボカド", perPiece: { cal: 260, p: 3.0, f: 25.0, c: 8.0 }, icon: "🥑" },
+    { keywords: [/sausage|wiener|winener|ソーセージ|ウインナー|香肠/i], name: "ウインナーソーセージ", perPiece: { cal: 65, p: 2.5, f: 6.0, c: 0.6 }, icon: "🌭" },
+    { keywords: [/ham|ハム|火腿/i], name: "ロースハム", perPiece: { cal: 20, p: 1.8, f: 1.2, c: 0.3 }, icon: "🍖" },
+    { keywords: [/egg|tamago|卵|たまご|玉子/i], name: "卵", perPiece: { cal: 76, p: 6.2, f: 5.2, c: 0.2 }, icon: "🥚" },
+    { keywords: [/bread|toast|パン|トースト/i], name: "食パン", perPiece: { cal: 160, p: 6.0, f: 2.5, c: 28.0 }, icon: "🍞" },
   ];
-
-  // グラム表記または個数表記が含まれているかチェック
-  const hasWeight = /(\d+(?:\.\d+)?)\s*(g|グラム|個)?/i.test(query);
-  const hasCount = /(\d+(?:\.\d+)?)\s*(個|つ|個入)/i.test(query);
 
   // 個数ベース照合
   for (const item of countDb) {
     if (item.keywords.some((r) => r.test(query))) {
-      const countMatch = query.match(/(\d+(?:\.\d+)?)\s*(個|つ|個入)?/i);
-      const count = countMatch ? parseFloat(countMatch[1]) : (item.defaultCount || 1);
+      const countMatch = query.match(/(\d+(?:\.\d+)?)\s*(個|つ|本|粒|枚|個入)?/i);
+      const count = countMatch ? parseFloat(countMatch[1]) : 1;
       return {
         food_name: `${item.name} (${count}個)`,
         label: `${item.name} (${count}個)`,
@@ -927,7 +939,7 @@ export function estimateNutrition(input: string): {
   // グラムベース照合
   for (const item of weightDb) {
     if (item.keywords.some((r) => r.test(query))) {
-      const weightMatch = query.match(/(\d+(?:\.\d+)?)\s*(g|グラム|個)?/i);
+      const weightMatch = query.match(/(\d+(?:\.\d+)?)\s*(g|グラム)?/i);
       const grams = weightMatch ? parseFloat(weightMatch[1]) : 100;
       const ratio = grams / 100;
       return {
@@ -959,55 +971,14 @@ export function estimateNutrition(input: string): {
     };
   }
 
-  // 3. ヒューリスティック推定
-
-  if (/肉|チキン|牛|豚|ささみ|魚|エビ|サーモン|プロテイン/i.test(query)) {
-    return {
-      food_name: query,
-      label: `${query} (一般的な肉・魚・高タンパク質)`,
-      calories: 200,
-      protein: 20.0,
-      fat: 10.0,
-      carbs: 2.0,
-      isExactOrKnown: false,
-      icon: "🥩",
-    };
-  }
-
-  if (/飯|ごはん|米|麺|パン|パスタ|うどん|丼|ラーメン|オートミール/i.test(query)) {
-    return {
-      food_name: query,
-      label: `${query} (一般的な主食・炭水化物)`,
-      calories: 250,
-      protein: 6.0,
-      fat: 3.0,
-      carbs: 50.0,
-      isExactOrKnown: false,
-      icon: "🍚",
-    };
-  }
-
-  if (/サラダ|野菜|スープ|味噌汁|ブロッコリー/i.test(query)) {
-    return {
-      food_name: query,
-      label: `${query} (一般的な野菜・汁物)`,
-      calories: 60,
-      protein: 2.0,
-      fat: 1.0,
-      carbs: 10.0,
-      isExactOrKnown: false,
-      icon: "🥗",
-    };
-  }
-
-  // デフォルト値
+  // 3. 該当食材がない場合（適当な150kcal等のデフォルト値を完全廃止し、未特定として返却）
   return {
-    food_name: query || "未指定の食品",
-    label: `${query || "食品"} (標準的な概算値)`,
-    calories: 150,
-    protein: 8.0,
-    fat: 5.0,
-    carbs: 18.0,
+    food_name: query,
+    label: `${query} (未登録食材)`,
+    calories: 0,
+    protein: 0,
+    fat: 0,
+    carbs: 0,
     isExactOrKnown: false,
     icon: "🍽️",
   };

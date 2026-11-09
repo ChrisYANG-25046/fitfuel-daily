@@ -324,21 +324,21 @@ export default function Home() {
     }
 
     const result = estimateNutrition(trimmed);
-
-    // 入力欄に数値を自動反映（ユーザーは後から自由に編集可能）
-    setCalories(result.calories.toString());
-    setProtein(result.protein.toString());
-    setFat(result.fat.toString());
-    setCarbs(result.carbs.toString());
     setShowSuggestions(false);
 
     if (result.isExactOrKnown) {
+      // 登録食材が見つかった場合：数値を自動入力
+      setCalories(result.calories.toString());
+      setProtein(result.protein.toString());
+      setFat(result.fat.toString());
+      setCarbs(result.carbs.toString());
       setEstimateNote(
-        `「${result.label}」の栄養データを自動入力しました。※概算値です。必要に応じて微調整してください。`
+        `「${result.label}」の栄養データを自動入力しました。※必要に応じて微調整してください。`
       );
     } else {
+      // 未知の食材の場合：デフォルト誤データ（150kcal等）をセットせず手動入力モードを維持
       setEstimateNote(
-        `「${trimmed}」の標準的な概算値（${result.calories} kcal）を入力しました。※概算値です。必要に応じて微調整してください。`
+        `「${trimmed}」に該当する生鮮食品が見つかりませんでした。正確な数値を手入力してください。`
       );
     }
   };
