@@ -11,7 +11,6 @@ import {
   Trash2,
   AlertCircle,
   CheckCircle2,
-  Database,
   Sparkles,
   Info,
   Target,
@@ -938,8 +937,8 @@ export default function Home() {
           </p>
         </header>
 
-        {/* Supabase 接続状態カード */}
-        {!isSupabaseConfigured ? (
+        {/* Supabase 未設定時の案内バナー（本番環境では接続完了バナーは非表示） */}
+        {!isSupabaseConfigured && (
           <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 shadow-sm">
             <div className="flex items-start gap-3">
               <AlertCircle className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
@@ -968,17 +967,6 @@ export default function Home() {
                 </p>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between p-3.5 bg-emerald-50 border border-emerald-200/80 rounded-xl text-emerald-800 text-xs sm:text-sm">
-            <div className="flex items-center gap-2">
-              <Database className="w-4 h-4 text-emerald-600" />
-              <span>Supabase Client 接続完了（meals &amp; presets 同期中）</span>
-            </div>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              接続中
-            </span>
           </div>
         )}
 

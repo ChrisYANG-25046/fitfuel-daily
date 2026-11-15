@@ -35,6 +35,7 @@ export const POPULAR_FOOD_TAGS = [
   { name: "カレー", icon: "🍛", label: "カレーライス" },
   { name: "プロテイン", icon: "🥤", label: "ホエイプロテイン" },
   { name: "サラダ", icon: "🥗", label: "グリーンサラダ" },
+  { name: "トマト", icon: "🍅", label: "トマト (1個)" },
   { name: "白ご飯", icon: "🍚", label: "白ご飯 (150g)" },
   { name: "サラダチキン", icon: "🍗", label: "サラダチキン (110g)" },
   { name: "ゆで卵", icon: "🥚", label: "ゆで卵 (1個)" },
@@ -367,6 +368,30 @@ export const FOOD_DATABASE: FoodNutritionRule[] = [
     carbs: 5.2,
     icon: "🥦",
     description: "筋トレ・減量定番の高タンパク＆高ビタミン野菜。",
+  },
+  {
+    name: "トマト",
+    label: "トマト (中玉 1個 150g)",
+    category: "野菜・サラダ",
+    keywords: ["トマト", "とまと", "tomato", "番茄", "西红柿"],
+    calories: 30,
+    protein: 1.1,
+    fat: 0.2,
+    carbs: 7.0,
+    icon: "🍅",
+    description: "リコピンやビタミンCが豊富で低カロリーな健康野菜。",
+  },
+  {
+    name: "ミニトマト",
+    label: "ミニトマト (5個 約75g)",
+    category: "野菜・サラダ",
+    keywords: ["ミニトマト", "プチトマト", "みにとまと", "ぷちとまと", "cherry tomato", "小番茄"],
+    calories: 22,
+    protein: 0.8,
+    fat: 0.1,
+    carbs: 5.4,
+    icon: "🍅",
+    description: "手軽につまめるビタミン補給。サラダやお弁当の彩りに。",
   },
   {
     name: "味噌汁",
@@ -886,13 +911,46 @@ export function estimateNutrition(input: string): {
   }
 
   // 1. 数量・重量解析（自然言語換算エンジン）
-  // 日本大型スーパー定番生鮮・果物・魚介・肉類精細データベース
+  // 日本大型スーパー定番生鮮・果物・魚介・肉類・野菜・菌類・豆類精細データベース
   // --- グラムベース (100gあたり) ---
   const weightDb = [
+    // 葉物・根菜・定番野菜
+    { keywords: [/cabbage|キャベツ|甘藍/i], name: "キャベツ", per100g: { cal: 21, p: 1.3, f: 0.1, c: 4.8 }, icon: "🥬" },
+    { keywords: [/lettuce|レタス|生菜/i], name: "レタス", per100g: { cal: 11, p: 0.6, f: 0.1, c: 2.3 }, icon: "🥬" },
+    { keywords: [/chinese cabbage|白菜|はくさい/i], name: "白菜", per100g: { cal: 13, p: 0.9, f: 0.1, c: 3.0 }, icon: "🥬" },
+    { keywords: [/spinach|ほうれん草|ホウレンソウ|菠菜/i], name: "ほうれん草", per100g: { cal: 18, p: 2.2, f: 0.3, c: 3.1 }, icon: "🥬" },
+    { keywords: [/komatsuna|小松菜/i], name: "小松菜", per100g: { cal: 13, p: 1.5, f: 0.2, c: 2.4 }, icon: "🥬" },
+    { keywords: [/onion|玉ねぎ|タマネギ|洋葱/i], name: "玉ねぎ", per100g: { cal: 33, p: 0.8, f: 0.1, c: 7.5 }, icon: "🧅" },
+    { keywords: [/green onion|leek|長ネギ|長ねぎ|白ネギ|青ネギ|小ネギ|大葱|(?<![玉たま])ネギ|(?<![玉たま])ねぎ/i], name: "長ネギ", per100g: { cal: 34, p: 1.5, f: 0.1, c: 7.0 }, icon: "🌱" },
+    { keywords: [/chive|nira|ニラ|にら|韭菜/i], name: "ニラ", per100g: { cal: 21, p: 1.7, f: 0.3, c: 4.0 }, icon: "🌱" },
+    { keywords: [/sprout|moyashi|もやし|豆芽/i], name: "もやし", per100g: { cal: 15, p: 1.7, f: 0.1, c: 2.6 }, icon: "🌱" },
+    { keywords: [/mini.*tomato|petit.*tomato|ミニトマト|プチトマト|小番茄/i], name: "ミニトマト", per100g: { cal: 30, p: 1.1, f: 0.1, c: 7.2 }, icon: "🍅" },
+    { keywords: [/tomato|トマト|西紅柿|西红柿/i], name: "トマト", per100g: { cal: 20, p: 0.7, f: 0.1, c: 4.7 }, icon: "🍅" },
+    { keywords: [/cucumber|きゅうり|キュウリ|黄瓜/i], name: "きゅうり", per100g: { cal: 14, p: 0.8, f: 0.1, c: 3.0 }, icon: "🥒" },
+    { keywords: [/eggplant|ナス|茄子/i], name: "ナス", per100g: { cal: 22, p: 1.1, f: 0.1, c: 5.1 }, icon: "🍆" },
+    { keywords: [/green pepper|ピーマン|青椒/i], name: "ピーマン", per100g: { cal: 20, p: 1.0, f: 0.2, c: 4.7 }, icon: "🫑" },
+    { keywords: [/broccoli|ブロッコリー|西兰花/i], name: "ブロッコリー", per100g: { cal: 37, p: 4.3, f: 0.6, c: 5.2 }, icon: "🥦" },
+    { keywords: [/carrot|人参|にんじん|胡蘿蔔|胡萝卜/i], name: "人参", per100g: { cal: 35, p: 0.8, f: 0.2, c: 8.5 }, icon: "🥕" },
+    { keywords: [/radish|大根|だいこん|白萝卜/i], name: "大根", per100g: { cal: 15, p: 0.4, f: 0.1, c: 3.8 }, icon: "🥢" },
+    { keywords: [/pumpkin|かぼちゃ|カボチャ|南瓜/i], name: "かぼちゃ", per100g: { cal: 78, p: 1.6, f: 0.3, c: 20.6 }, icon: "🎃" },
+    { keywords: [/potato|じゃがいも|ジャガイモ|马铃薯/i], name: "じゃがいも", per100g: { cal: 76, p: 1.6, f: 0.1, c: 17.3 }, icon: "🥔" },
+    { keywords: [/sweet potato|さつまいも|サツマイモ|红薯/i], name: "さつまいも", per100g: { cal: 126, p: 1.2, f: 0.2, c: 31.5 }, icon: "🍠" },
+
+    // 菌類（きのこ）
+    { keywords: [/eringi|エリンギ|杏鲍菇/i], name: "エリンギ", per100g: { cal: 19, p: 2.8, f: 0.3, c: 4.3 }, icon: "🍄" },
+    { keywords: [/shimeji|しめじ|シメジ/i], name: "しめじ", per100g: { cal: 18, p: 2.0, f: 0.4, c: 4.8 }, icon: "🍄" },
+    { keywords: [/enoki|えのき|エノキ|金针菇/i], name: "えのき", per100g: { cal: 22, p: 2.7, f: 0.2, c: 7.6 }, icon: "🍄" },
+    { keywords: [/shiitake|しいたけ|シイタケ|香菇/i], name: "しいたけ", per100g: { cal: 25, p: 3.0, f: 0.4, c: 5.5 }, icon: "🍄" },
+
+    // 豆製品
+    { keywords: [/tofu|豆腐|とうふ/i], name: "木綿/絹豆腐", per100g: { cal: 72, p: 6.6, f: 4.2, c: 1.6 }, icon: "🧊" },
+    { keywords: [/edamame|枝豆|毛豆/i], name: "枝豆", per100g: { cal: 135, p: 11.7, f: 6.2, c: 8.8 }, icon: "🫛" },
+
+    // フルーツ・肉・海鮮・主食
     { keywords: [/grape|ぶどう|ブドウ|葡萄/i], name: "ぶどう", per100g: { cal: 59, p: 0.4, f: 0.1, c: 15.2 }, icon: "🍇" },
     { keywords: [/chicken|チキン|鶏|胸肉|むね肉|ささみ|鶏肉/i], name: "鶏むね肉/ささみ", per100g: { cal: 108, p: 23.3, f: 1.5, c: 0.0 }, icon: "🍗" },
     { keywords: [/thigh|もも肉|鶏もも/i], name: "鶏もも肉", per100g: { cal: 190, p: 16.6, f: 14.2, c: 0.0 }, icon: "🍗" },
-    { keywords: [/beef|牛|牛肉|ステーキ/i], name: "牛肉 (赤身/バラ平均)", per100g: { cal: 240, p: 18.0, f: 17.5, c: 0.4 }, icon: "🥩" },
+    { keywords: [/beef|牛|牛肉|ステーキ/i], name: "牛肉", per100g: { cal: 240, p: 18.0, f: 17.5, c: 0.4 }, icon: "🥩" },
     { keywords: [/pork|豚|豚肉|ポーク|ロース/i], name: "豚肉", per100g: { cal: 210, p: 19.3, f: 14.7, c: 0.2 }, icon: "🥩" },
     { keywords: [/salmon|鮭|サーモン|三文鱼/i], name: "鮭/サーモン", per100g: { cal: 170, p: 20.1, f: 9.4, c: 0.1 }, icon: "🐟" },
     { keywords: [/tuna|マグロ|まぐろ|金枪鱼/i], name: "マグロ (赤身)", per100g: { cal: 115, p: 26.4, f: 1.4, c: 0.1 }, icon: "🐟" },
@@ -904,51 +962,100 @@ export function estimateNutrition(input: string): {
     { keywords: [/noodle|ramen|udon|麺|ラーメン|うどん|そば|パスタ/i], name: "麺類", per100g: { cal: 175, p: 4.5, f: 1.0, c: 35.0 }, icon: "🍜" },
   ];
 
-  // --- 個数ベース (1個/1本/1粒/1枚あたり) ---
+  // --- 個数ベース (1個/1本/1粒/1枚/1パックあたり) ---
   const countDb = [
-    { keywords: [/kiwi|キウイ|奇异果|弥生/i], name: "キウイフルーツ", perPiece: { cal: 53, p: 1.0, f: 0.1, c: 13.5 }, icon: "🥝" },
+    { keywords: [/natto|納豆|纳豆/i], name: "納豆", perPiece: { cal: 100, p: 8.3, f: 5.0, c: 6.0 }, icon: "🥢", unit: "パック" },
+    { keywords: [/mini.*tomato|petit.*tomato|ミニトマト|プチトマト|小番茄/i], name: "ミニトマト", perPiece: { cal: 4, p: 0.1, f: 0.0, c: 1.0 }, icon: "🍅" },
+    { keywords: [/tomato|トマト|西紅柿|西红柿/i], name: "トマト", perPiece: { cal: 30, p: 1.0, f: 0.2, c: 7.0 }, icon: "🍅" },
+    { keywords: [/cucumber|きゅうり|キュウリ|黄瓜/i], name: "きゅうり", perPiece: { cal: 14, p: 0.8, f: 0.1, c: 3.0 }, icon: "🥒" },
+    { keywords: [/eggplant|ナス|茄子/i], name: "ナス", perPiece: { cal: 18, p: 0.9, f: 0.1, c: 4.1 }, icon: "🍆" },
+    { keywords: [/green pepper|ピーマン|青椒/i], name: "ピーマン", perPiece: { cal: 6, p: 0.3, f: 0.1, c: 1.4 }, icon: "🫑" },
+    { keywords: [/green onion|leek|長ネギ|長ねぎ|ネギ|ねぎ|大葱/i], name: "長ネギ", perPiece: { cal: 34, p: 1.5, f: 0.1, c: 7.0 }, icon: "🌱" },
+    { keywords: [/onion|玉ねぎ|タマネギ|洋葱/i], name: "玉ねぎ", perPiece: { cal: 65, p: 1.5, f: 0.1, c: 15.0 }, icon: "🧅" },
+    { keywords: [/potato|じゃがいも|ジャガイモ|马铃薯/i], name: "じゃがいも", perPiece: { cal: 76, p: 1.6, f: 0.1, c: 17.3 }, icon: "🥔" },
+    { keywords: [/shiitake|しいたけ|シイタケ|香菇/i], name: "しいたけ", perPiece: { cal: 4, p: 0.5, f: 0.1, c: 1.0 }, icon: "🍄" },
+    { keywords: [/kiwi|キウイ|奇异果/i], name: "キウイフルーツ", perPiece: { cal: 53, p: 1.0, f: 0.1, c: 13.5 }, icon: "🥝" },
     { keywords: [/apple|りんご|リンゴ|苹果/i], name: "りんご", perPiece: { cal: 138, p: 0.5, f: 0.3, c: 38.0 }, icon: "🍎" },
     { keywords: [/banana|バナナ|香蕉/i], name: "バナナ", perPiece: { cal: 86, p: 1.1, f: 0.2, c: 22.5 }, icon: "🍌" },
-    { keywords: [/orange|mikan|みかん|ミカン|桔子|橙子/i], name: "みかん/オレンジ", perPiece: { cal: 45, p: 0.7, f: 0.1, c: 11.0 }, icon: "🍊" },
+    { keywords: [/orange|mikan|みかん|ミカン|橘子/i], name: "みかん", perPiece: { cal: 45, p: 0.7, f: 0.1, c: 11.0 }, icon: "🍊" },
     { keywords: [/strawberry|いちご|イチゴ|草莓/i], name: "いちご", perPiece: { cal: 5, p: 0.1, f: 0.0, c: 1.2 }, icon: "🍓" },
     { keywords: [/avocado|アボカド|牛油果/i], name: "アボカド", perPiece: { cal: 260, p: 3.0, f: 25.0, c: 8.0 }, icon: "🥑" },
-    { keywords: [/sausage|wiener|winener|ソーセージ|ウインナー|香肠/i], name: "ウインナーソーセージ", perPiece: { cal: 65, p: 2.5, f: 6.0, c: 0.6 }, icon: "🌭" },
-    { keywords: [/ham|ハム|火腿/i], name: "ロースハム", perPiece: { cal: 20, p: 1.8, f: 1.2, c: 0.3 }, icon: "🍖" },
+    { keywords: [/sausage|wiener|ソーセージ|ウインナー/i], name: "ウインナーソーセージ", perPiece: { cal: 65, p: 2.5, f: 6.0, c: 0.6 }, icon: "🌭" },
+    { keywords: [/ham|ハム/i], name: "ロースハム", perPiece: { cal: 20, p: 1.8, f: 1.2, c: 0.3 }, icon: "🍖" },
     { keywords: [/egg|tamago|卵|たまご|玉子/i], name: "卵", perPiece: { cal: 76, p: 6.2, f: 5.2, c: 0.2 }, icon: "🥚" },
     { keywords: [/bread|toast|パン|トースト/i], name: "食パン", perPiece: { cal: 160, p: 6.0, f: 2.5, c: 28.0 }, icon: "🍞" },
   ];
 
-  // 個数ベース照合
+  const explicitWeightMatch = query.match(/(\d+(?:\.\d+)?)\s*(g|グラム)/i);
+  const explicitCountMatch = query.match(/(\d+(?:\.\d+)?)\s*(個|つ|本|粒|枚|パック|个|個入)/i);
+
+  // グラム指定がある場合
+  if (explicitWeightMatch) {
+    const grams = parseFloat(explicitWeightMatch[1]);
+    const ratio = grams / 100;
+    for (const item of weightDb) {
+      if (item.keywords.some((r) => r.test(query))) {
+        return {
+          food_name: `${item.name} (${grams}g)`,
+          label: `${item.name} (${grams}g)`,
+          calories: Math.round(item.per100g.cal * ratio),
+          protein: parseFloat((item.per100g.p * ratio).toFixed(1)),
+          fat: parseFloat((item.per100g.f * ratio).toFixed(1)),
+          carbs: parseFloat((item.per100g.c * ratio).toFixed(1)),
+          isExactOrKnown: true,
+          icon: item.icon,
+        };
+      }
+    }
+  }
+
+  // 個数指定がある場合
+  if (explicitCountMatch) {
+    const count = parseFloat(explicitCountMatch[1]);
+    for (const item of countDb) {
+      if (item.keywords.some((r) => r.test(query))) {
+        const unit = item.unit || "個";
+        return {
+          food_name: `${item.name} (${count}${unit})`,
+          label: `${item.name} (${count}${unit})`,
+          calories: Math.round(item.perPiece.cal * count),
+          protein: parseFloat((item.perPiece.p * count).toFixed(1)),
+          fat: parseFloat((item.perPiece.f * count).toFixed(1)),
+          carbs: parseFloat((item.perPiece.c * count).toFixed(1)),
+          isExactOrKnown: true,
+          icon: item.icon,
+        };
+      }
+    }
+  }
+
+  // 単位指定なしで個数ベース照合
   for (const item of countDb) {
     if (item.keywords.some((r) => r.test(query))) {
-      const countMatch = query.match(/(\d+(?:\.\d+)?)\s*(個|つ|本|粒|枚|個入)?/i);
-      const count = countMatch ? parseFloat(countMatch[1]) : 1;
+      const unit = item.unit || "個";
       return {
-        food_name: `${item.name} (${count}個)`,
-        label: `${item.name} (${count}個)`,
-        calories: Math.round(item.perPiece.cal * count),
-        protein: parseFloat((item.perPiece.p * count).toFixed(1)),
-        fat: parseFloat((item.perPiece.f * count).toFixed(1)),
-        carbs: parseFloat((item.perPiece.c * count).toFixed(1)),
+        food_name: `${item.name} (1${unit})`,
+        label: `${item.name} (1${unit})`,
+        calories: item.perPiece.cal,
+        protein: item.perPiece.p,
+        fat: item.perPiece.f,
+        carbs: item.perPiece.c,
         isExactOrKnown: true,
         icon: item.icon,
       };
     }
   }
 
-  // グラムベース照合
+  // 単位指定なしでグラムベース照合
   for (const item of weightDb) {
     if (item.keywords.some((r) => r.test(query))) {
-      const weightMatch = query.match(/(\d+(?:\.\d+)?)\s*(g|グラム)?/i);
-      const grams = weightMatch ? parseFloat(weightMatch[1]) : 100;
-      const ratio = grams / 100;
       return {
-        food_name: `${item.name} (${grams}g)`,
-        label: `${item.name} (${grams}g)`,
-        calories: Math.round(item.per100g.cal * ratio),
-        protein: parseFloat((item.per100g.p * ratio).toFixed(1)),
-        fat: parseFloat((item.per100g.f * ratio).toFixed(1)),
-        carbs: parseFloat((item.per100g.c * ratio).toFixed(1)),
+        food_name: `${item.name} (100g)`,
+        label: `${item.name} (100g)`,
+        calories: item.per100g.cal,
+        protein: item.per100g.p,
+        fat: item.per100g.f,
+        carbs: item.per100g.c,
         isExactOrKnown: true,
         icon: item.icon,
       };
